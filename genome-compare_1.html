@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genome Compare — two sequences, side by side</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #14171c;
+    --panel: #1c2129;
+    --panel-2: #20262f;
+    --line: #2b323d;
+    --ink: #eae7de;
+    --muted: #7d8590;
+    --a-color: #e8a33d;
+    --b-color: #5fb3a3;
+    --font-ui: 'Space Grotesk', sans-serif;
+    --font-data: 'IBM Plex Mono', monospace;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    padding: 28px 28px 40px;
+  }
+  .wrap{ max-width: 1040px; margin: 0 auto; }
+  header{ margin-bottom: 22px; }
+  h1{ font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p{ margin: 0; color: var(--muted); font-size: 14px; max-width: 68ch; line-height: 1.55; }
+  header p.caveat{ color: var(--a-color); margin-top: 8px; }
+
+  .panel{ background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+  .panel h2{ font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 14px; font-weight: 600; }
+
+  .seq-pair{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px){ .seq-pair{ grid-template-columns: 1fr; } }
+  .seq-box{ border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--panel-2); }
+  .seq-box .tag{ font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+  .seq-box.a .tag{ color: var(--a-color); }
+  .seq-box.b .tag{ color: var(--b-color); }
+  .seq-box input[type="file"]{ font-size: 12px; color: var(--muted); margin-bottom: 8px; width: 100%; }
+  .seq-box textarea{
+    width: 100%; min-height: 70px; background: #171b21; border: 1px solid var(--line);
+    border-radius: 6px; padding: 8px 10px; font-family: var(--font-data); font-size: 12px;
+    color: var(--ink); resize: vertical;
+  }
+  .seq-box .meta{ font-size: 11.5px; color: var(--muted); margin-top: 6px; font-family: var(--font-data); }
+
+  .controls{ display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-top: 16px; }
+  .field{ display: flex; flex-direction: column; gap: 6px; }
+  .field label{ font-size: 12px; color: var(--muted); }
+  select, input[type="range"]{ font-family: var(--font-ui); font-size: 14px; color: var(--ink); }
+  select{ background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  input[type="range"]{ width: 140px; accent-color: var(--a-color); }
+  .range-val{ font-size: 12px; font-family: var(--font-data); }
+  .btn{ background: transparent; border: 1px solid var(--a-color); color: var(--a-color); border-radius: 6px; padding: 9px 16px; cursor: pointer; font-weight: 600; }
+  .btn:hover{ background: var(--a-color); color: #1a1305; }
+  .btn.stop{ border-color: var(--muted); color: var(--muted); }
+  .btn.stop:hover{ background: var(--muted); color: #14171c; }
+
+  .skyline-row{ display: flex; align-items: flex-end; height: 90px; gap: 1px; margin-top: 6px; }
+  .sky-bar{ flex: 1; border-radius: 2px 2px 0 0; cursor: pointer; min-width: 2px; transition: opacity 0.1s; }
+  .sky-bar:hover{ opacity: 0.75; }
+  .sky-bar.selected{ outline: 2px solid #fff; outline-offset: -2px; }
+  .sky-label{ font-size: 11px; color: var(--muted); margin-top: 4px; font-family: var(--font-data); }
+
+  .detail-pair{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 4px; }
+  @media (max-width: 720px){ .detail-pair{ grid-template-columns: 1fr; } }
+  .detail-ribbon{ font-family: var(--font-data); line-height: 1.4; word-break: break-all; padding: 10px; background: var(--panel-2); border-radius: 6px; border: 1px solid var(--line); min-height: 50px; font-size: 13px; }
+  .detail-ribbon .grp{ padding: 2px 1px; border-radius: 3px; }
+  .detail-ribbon .grp[data-depth="1"], .detail-ribbon .grp[data-depth="2"]{ box-shadow: 0 0 0 1px rgba(95,179,163,0.5) inset; }
+  .ch.active{ background: #fff; color: #14171c; border-radius: 2px; }
+
+  .note{ font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 10px; }
+
+  .anchor-ticks{ display: flex; gap: 1px; height: 8px; margin-top: 2px; }
+  .anchor-tick{ flex: 1; min-width: 2px; }
+  .anchor-tick.hit{ background: #fff; border-radius: 1px; }
+
+  .block-list{ display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .block-item{
+    display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center;
+    padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+    font-family: var(--font-data); font-size: 12px; cursor: pointer;
+  }
+  .block-item:hover{ border-color: var(--a-color); }
+  .block-item .drift-pos{ color: var(--a-color); }
+  .block-item .drift-neg{ color: var(--b-color); }
+  .ch.anchor-core{ background: rgba(255,255,255,0.18); border-radius: 2px; }
+
+  .identity-result{
+    font-family: var(--font-data); font-size: 13px; margin-top: 10px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+  }
+  .hit-list, .remainder-list{ display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+  .hit-item, .remainder-item{
+    font-family: var(--font-data); font-size: 12px; padding: 7px 10px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+    display: flex; justify-content: space-between; gap: 10px;
+  }
+  .remainder-item.unassigned{ border-color: rgba(232,163,61,0.4); }
+  .remainder-item .tagname{ color: var(--teal, #5fb3a3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Genome Compare</h1>
+    <p>Load two sequences (gene-scale, up to ~50kb each). Both get divided into the same number of proportional windows and scored for repeat structure, so you can scan the two side by side — then click any window to zoom into the actual mirror-grouped bases, and hear both at once, A panned left, B panned right.</p>
+    <p class="caveat">This compares structural repeat profiles, not sequence identity — it isn't an alignment tool (no BLAST-style homology matching). Windows are matched by proportional position, not by matching bases.</p>
+  </header>
+
+  <div class="panel">
+    <h2>Sequences</h2>
+    <div class="seq-pair">
+      <div class="seq-box a">
+        <div class="tag">Sequence A</div>
+        <input type="file" id="fileA" accept=".fa,.fasta,.txt">
+        <textarea id="textA" placeholder="Or paste a FASTA record or raw sequence here…"></textarea>
+        <div class="meta" id="metaA">No sequence loaded.</div>
+      </div>
+      <div class="seq-box b">
+        <div class="tag">Sequence B</div>
+        <input type="file" id="fileB" accept=".fa,.fasta,.txt">
+        <textarea id="textB" placeholder="Or paste a FASTA record or raw sequence here…"></textarea>
+        <div class="meta" id="metaB">No sequence loaded.</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="field">
+        <label for="numWindows">Resolution: <span id="numWindowsVal" class="range-val">80</span> windows</label>
+        <input type="range" id="numWindows" min="20" max="200" step="10" value="80">
+      </div>
+      <div class="field">
+        <label for="metric">Metric</label>
+        <select id="metric">
+          <option value="repeatDensity">Repeat density</option>
+          <option value="longest">Longest group</option>
+          <option value="groupCount">Group count</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tuning">Tuning</label>
+        <select id="tuning">
+          <option value="440">440 Hz</option>
+          <option value="432">432 Hz</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tempo">Tempo: <span id="tempoVal" class="range-val">6</span>/sec</label>
+        <input type="range" id="tempo" min="2" max="14" step="1" value="6">
+      </div>
+      <div class="field"><button class="btn" id="buildBtn">Build comparison</button></div>
+    </div>
+  </div>
+
+  <div class="panel" id="overviewPanel" style="display:none;">
+    <h2>Overview — structural profile, aligned proportionally</h2>
+    <div class="sky-label">Sequence A</div>
+    <div class="skyline-row" id="skyA"></div>
+    <div class="anchor-ticks" id="ticksA"></div>
+    <div class="sky-label" style="margin-top:12px;">Sequence B</div>
+    <div class="skyline-row" id="skyB"></div>
+    <div class="anchor-ticks" id="ticksB"></div>
+    <div class="controls">
+      <div class="field"><button class="btn" id="playProfileBtn">▶ Play profile (A left / B right)</button></div>
+      <div class="field"><button class="btn stop" id="stopProfileBtn">■ Stop</button></div>
+    </div>
+    <p class="note">Click any window (in either row) to zoom into that region below. White ticks mark where matched Lego blocks (below) fall — use them to see how far the two sequences have drifted apart by that point.</p>
+  </div>
+
+  <div class="panel" id="blocksPanel" style="display:none;">
+    <h2>Matched blocks — shared "Lego" groups between A and B</h2>
+    <div class="controls" style="margin-top:0;">
+      <div class="field">
+        <label for="minBlockLen">Min block length: <span id="minBlockLenVal" class="range-val">6</span></label>
+        <input type="range" id="minBlockLen" min="4" max="20" step="1" value="6">
+      </div>
+      <div class="field">
+        <label for="blockSort">Sort by</label>
+        <select id="blockSort">
+          <option value="len">Size (largest first)</option>
+          <option value="pos">Position</option>
+        </select>
+      </div>
+      <div class="field"><button class="btn" id="findBlocksBtn">Find matched blocks</button></div>
+    </div>
+    <p class="note" style="margin-top:12px;">Every mirror group that appears in <em>both</em> sequences becomes a candidate landmark. Candidates are kept only if they can be chained into a consistent, non-crossing order — the same basic idea genome aligners like MUMmer use, just built from mirror groups instead of arbitrary substrings. This is a heuristic landmark map, not a formal sequence alignment.</p>
+    <div class="block-list" id="blockList" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="panel" id="detailPanel" style="display:none;">
+    <h2>Zoom — window <span id="detailIndexLabel"></span></h2>
+    <div class="detail-pair">
+      <div>
+        <div class="sky-label" style="color:var(--a-color);">A: bases <span id="detailRangeA"></span></div>
+        <div class="detail-ribbon" id="ribbonA"></div>
+      </div>
+      <div>
+        <div class="sky-label" style="color:var(--b-color);">B: bases <span id="detailRangeB"></span></div>
+        <div class="detail-ribbon" id="ribbonB"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="field"><button class="btn" id="playDetailBtn">▶ Play both (A left / B right)</button></div>
+      <div class="field"><button class="btn stop" id="stopDetailBtn">■ Stop</button></div>
+      <div class="field"><button class="btn" id="identityBtn">Compute identity (A vs B, this window)</button></div>
+    </div>
+    <div class="identity-result" id="identityResult" style="display:none;"></div>
+  </div>
+
+  <div class="panel" id="libraryPanel">
+    <h2>Known functions — match against sequences you supply</h2>
+    <p class="note" style="margin-top:0;">Paste short reference sequences (FASTA-style: <code>&gt;name</code> then sequence) — motifs, known genes, anything you already have identified. This checks both strands (forward and reverse complement) for exact matches. It does not query any external database.</p>
+    <textarea id="libraryText" placeholder=">TATA box&#10;TATAAA&#10;&#10;>my known gene fragment&#10;ATGGCTAGCATCG..." style="width:100%; min-height:80px; background:#171b21; border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-family:var(--font-data); font-size:12px; color:var(--ink);"></textarea>
+    <div class="controls">
+      <div class="field"><button class="btn" id="scanLibraryBtn">Scan A &amp; B for matches</button></div>
+    </div>
+    <div class="detail-pair" style="margin-top:12px;">
+      <div>
+        <div class="sky-label" style="color:var(--a-color);">Hits in A</div>
+        <div class="hit-list" id="hitListA"></div>
+      </div>
+      <div>
+        <div class="sky-label" style="color:var(--b-color);">Hits in B</div>
+        <div class="hit-list" id="hitListB"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="remaindersPanel" style="display:none;">
+    <h2>Remainders — the gaps between matched blocks</h2>
+    <p class="note" style="margin-top:0;">Whatever falls between (or outside) the matched Lego blocks, with no exact known-function hit inside it either. These are the parts of each sequence that neither structural matching nor your known-function library currently explains — not necessarily meaningless, just unaccounted for so far.</p>
+    <div class="detail-pair">
+      <div>
+        <div class="sky-label" style="color:var(--a-color);">A remainders</div>
+        <div class="remainder-list" id="remaindersA"></div>
+      </div>
+      <div>
+        <div class="sky-label" style="color:var(--b-color);">B remainders</div>
+        <div class="remainder-list" id="remaindersB"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---------- parsing ----------
+function parseFastaOrRaw(text){
+  if (!text) return '';
+  const lines = text.split(/\r?\n/);
+  let seq = '';
+  let sawHeader = false;
+  for (const line of lines){
+    if (line.startsWith('>')){ sawHeader = true; continue; }
+    seq += line.trim();
+  }
+  if (!sawHeader) seq = text.replace(/\s+/g, '');
+  return seq.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+// ---------- mirror grouping ----------
+function mirrorGroups(seq){
+  if (!seq.length) return [];
+  const groups = [];
+  let current = seq[0];
+  for (let i = 1; i < seq.length; i++){
+    const ch = seq[i];
+    if (ch === current[current.length - 1]){ groups.push(current); current = ch; }
+    else current += ch;
+  }
+  groups.push(current);
+  return groups;
+}
+function bracketDepth(s){
+  if (s.length < 2) return 0;
+  if (s[0] === s[s.length - 1]) return 1 + bracketDepth(s.slice(1, -1));
+  return 0;
+}
+function computeWindowedProfile(seq, numWindows){
+  const windowSize = Math.ceil(seq.length / numWindows);
+  const windows = [];
+  for (let i = 0; i < numWindows; i++){
+    const start = i * windowSize;
+    if (start >= seq.length) break;
+    const end = Math.min(start + windowSize, seq.length);
+    const sub = seq.slice(start, end);
+    const groups = mirrorGroups(sub);
+    const longest = groups.reduce((m, g) => Math.max(m, g.length), 0);
+    windows.push({
+      start, end, sub,
+      repeatDensity: sub.length ? (groups.length - 1) / sub.length * 100 : 0,
+      longest, groupCount: groups.length
+    });
+  }
+  return windows;
+}
+
+// ---------- matched-block ("Lego") anchoring ----------
+function mirrorGroupsWithPos(seq){
+  if (!seq.length) return [];
+  const groups = [];
+  let currentStart = 0, current = seq[0];
+  for (let i = 1; i < seq.length; i++){
+    const ch = seq[i];
+    if (ch === current[current.length - 1]){
+      groups.push({ text: current, start: currentStart, end: currentStart + current.length });
+      current = ch;
+      currentStart = i;
+    } else current += ch;
+  }
+  groups.push({ text: current, start: currentStart, end: currentStart + current.length });
+  return groups;
+}
+
+function findAnchorCandidates(groupsA, groupsB, minLen, maxOccurrences, maxCandidates){
+  const mapB = new Map();
+  for (const g of groupsB){
+    if (g.text.length < minLen) continue;
+    if (!mapB.has(g.text)) mapB.set(g.text, []);
+    mapB.get(g.text).push(g);
+  }
+  const countA = new Map();
+  for (const g of groupsA){
+    if (g.text.length >= minLen) countA.set(g.text, (countA.get(g.text) || 0) + 1);
+  }
+  let candidates = [];
+  for (const g of groupsA){
+    if (g.text.length < minLen) continue;
+    const bMatches = mapB.get(g.text);
+    if (!bMatches) continue;
+    // skip landmarks that are too repetitive to be trustworthy anchors
+    if (bMatches.length > maxOccurrences || (countA.get(g.text) || 0) > maxOccurrences) continue;
+    for (const m of bMatches){
+      candidates.push({ startA: g.start, endA: g.end, startB: m.start, endB: m.end, text: g.text, len: g.text.length });
+    }
+  }
+  if (candidates.length > maxCandidates){
+    candidates.sort((x, y) => y.len - x.len);
+    candidates = candidates.slice(0, maxCandidates);
+  }
+  return candidates;
+}
+
+// Chain candidates into the longest non-crossing, position-consistent path
+// (same idea as MUM-chaining in tools like MUMmer: maximize total matched
+// length while keeping both A-order and B-order increasing).
+function chainAnchors(candidates){
+  const cands = candidates.slice().sort((x, y) => x.startA - y.startA);
+  const n = cands.length;
+  if (!n) return [];
+  const dp = new Array(n).fill(0);
+  const prev = new Array(n).fill(-1);
+  let best = 0, bestIdx = 0;
+  for (let i = 0; i < n; i++){
+    dp[i] = cands[i].len;
+    for (let j = 0; j < i; j++){
+      if (cands[j].endA <= cands[i].startA && cands[j].endB <= cands[i].startB){
+        if (dp[j] + cands[i].len > dp[i]){
+          dp[i] = dp[j] + cands[i].len;
+          prev[i] = j;
+        }
+      }
+    }
+    if (dp[i] > best){ best = dp[i]; bestIdx = i; }
+  }
+  const chain = [];
+  let k = bestIdx;
+  while (k !== -1){ chain.push(cands[k]); k = prev[k]; }
+  chain.reverse();
+  return chain;
+}
+
+// ---------- sequence identity (real pairwise alignment, Needleman-Wunsch) ----------
+function needlemanWunsch(a, b, match, mismatch, gapPenalty){
+  match = match ?? 1; mismatch = mismatch ?? -1; gapPenalty = gapPenalty ?? -1;
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 0; i <= n; i++) dp[i][0] = i * gapPenalty;
+  for (let j = 0; j <= m; j++) dp[0][j] = j * gapPenalty;
+  for (let i = 1; i <= n; i++){
+    for (let j = 1; j <= m; j++){
+      const s = a[i - 1] === b[j - 1] ? match : mismatch;
+      dp[i][j] = Math.max(dp[i - 1][j - 1] + s, dp[i - 1][j] + gapPenalty, dp[i][j - 1] + gapPenalty);
+    }
+  }
+  let i = n, j = m, matches = 0, mismatches = 0, gaps = 0, alnLen = 0;
+  while (i > 0 || j > 0){
+    if (i > 0 && j > 0 && dp[i][j] === dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? match : mismatch)){
+      if (a[i - 1] === b[j - 1]) matches++; else mismatches++;
+      i--; j--;
+    } else if (i > 0 && dp[i][j] === dp[i - 1][j] + gapPenalty){ gaps++; i--; }
+    else { gaps++; j--; }
+    alnLen++;
+  }
+  return { alnLen, matches, mismatches, gaps, identity: alnLen ? matches / alnLen * 100 : 0 };
+}
+
+function computeIdentity(){
+  if (!currentDetailSubA || !currentDetailSubB) return;
+  const CAP = 2500; // keep the O(n*m) DP snappy in-browser
+  if (currentDetailSubA.length > CAP || currentDetailSubB.length > CAP){
+    identityResult.style.display = 'block';
+    identityResult.innerHTML = 'These windows are too long (' + currentDetailSubA.length + ' / ' + currentDetailSubB.length +
+      ' bases) for a full alignment here — try a smaller window or resolution.';
+    return;
+  }
+  const r = needlemanWunsch(currentDetailSubA, currentDetailSubB);
+  identityResult.style.display = 'block';
+  identityResult.innerHTML =
+    '<strong>' + r.identity.toFixed(1) + '% identity</strong> over an alignment of ' + r.alnLen + ' positions — ' +
+    r.matches + ' matches, ' + r.mismatches + ' mismatches, ' + r.gaps + ' gap positions. ' +
+    '(Global alignment, +1/-1/-1 scoring — a real, if simple, identity score.)';
+}
+
+// ---------- known-function library ----------
+function reverseComplement(seq){
+  const comp = { A: 'T', T: 'A', G: 'C', C: 'G' };
+  return seq.split('').reverse().map(c => comp[c] || c).join('');
+}
+function parseLibrary(text){
+  const entries = [];
+  let name = null, chunks = [];
+  for (const raw of text.split(/\r?\n/)){
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('>')){
+      if (name) entries.push({ name, seq: chunks.join('').toUpperCase().replace(/[^A-Z0-9]/g, '') });
+      name = line.slice(1).trim();
+      chunks = [];
+    } else chunks.push(line);
+  }
+  if (name) entries.push({ name, seq: chunks.join('').toUpperCase().replace(/[^A-Z0-9]/g, '') });
+  return entries.filter(e => e.seq.length > 0);
+}
+function scanForKnownFunctions(seq, library){
+  const hits = [];
+  for (const entry of library){
+    const fwd = entry.seq;
+    const rev = reverseComplement(fwd);
+    let idx = seq.indexOf(fwd);
+    while (idx !== -1){ hits.push({ name: entry.name, start: idx, end: idx + fwd.length, strand: '+' }); idx = seq.indexOf(fwd, idx + 1); }
+    if (rev !== fwd){
+      idx = seq.indexOf(rev);
+      while (idx !== -1){ hits.push({ name: entry.name, start: idx, end: idx + rev.length, strand: '-' }); idx = seq.indexOf(rev, idx + 1); }
+    }
+  }
+  hits.sort((x, y) => x.start - y.start);
+  return hits;
+}
+function renderHitList(container, hits){
+  container.innerHTML = '';
+  if (!hits.length){ container.innerHTML = '<p class="note">No exact matches.</p>'; return; }
+  hits.forEach(h => {
+    const row = document.createElement('div');
+    row.className = 'hit-item';
+    row.innerHTML = '<span>' + h.name + ' (' + h.strand + ' strand)</span><span>' + h.start + '–' + h.end + '</span>';
+    container.appendChild(row);
+  });
+}
+function scanLibrary(){
+  if (!seqA || !seqB) return;
+  const library = parseLibrary(libraryText.value);
+  libraryHitsA = library.length ? scanForKnownFunctions(seqA, library) : [];
+  libraryHitsB = library.length ? scanForKnownFunctions(seqB, library) : [];
+  renderHitList(hitListA, libraryHitsA);
+  renderHitList(hitListB, libraryHitsB);
+  renderRemainders();
+}
+
+// ---------- remainders: gaps left over after matched blocks + known functions ----------
+function computeGaps(seqLen, chain, useStart, useEnd){
+  const sorted = chain.slice().sort((x, y) => x[useStart] - y[useStart]);
+  const gaps = [];
+  let prevEnd = 0;
+  for (const c of sorted){
+    if (c[useStart] > prevEnd) gaps.push({ start: prevEnd, end: c[useStart] });
+    prevEnd = Math.max(prevEnd, c[useEnd]);
+  }
+  if (prevEnd < seqLen) gaps.push({ start: prevEnd, end: seqLen });
+  return gaps.filter(g => g.end > g.start);
+}
+function renderRemainderList(container, gaps, hits){
+  container.innerHTML = '';
+  if (!gaps.length){ container.innerHTML = '<p class="note">No gaps — matched blocks cover the whole sequence.</p>'; return; }
+  gaps.forEach(g => {
+    const containedHits = hits.filter(h => h.start >= g.start && h.end <= g.end);
+    const row = document.createElement('div');
+    row.className = 'remainder-item' + (containedHits.length ? '' : ' unassigned');
+    const label = containedHits.length
+      ? containedHits.map(h => '<span class="tagname">' + h.name + '</span>').join(', ')
+      : 'unassigned';
+    row.innerHTML = '<span>' + g.start + '–' + g.end + ' (' + (g.end - g.start) + ' bases)</span><span>' + label + '</span>';
+    container.appendChild(row);
+  });
+}
+function renderRemainders(){
+  if (!anchorChain.length && !libraryHitsA.length && !libraryHitsB.length) { remaindersPanel.style.display = 'none'; return; }
+  remaindersPanel.style.display = 'block';
+  const gapsA = computeGaps(seqA.length, anchorChain, 'startA', 'endA');
+  const gapsB = computeGaps(seqB.length, anchorChain, 'startB', 'endB');
+  renderRemainderList(remaindersAEl, gapsA, libraryHitsA);
+  renderRemainderList(remaindersBEl, gapsB, libraryHitsB);
+}
+
+identityBtn.addEventListener('click', computeIdentity);
+scanLibraryBtn.addEventListener('click', scanLibrary);
+
+// ---------- palette / audio ----------
+const PALETTE = ["#e8a33d","#5fb3a3","#c97b8a","#7b9fd4","#d4b85f","#8fbf6b","#b088c9","#e0806a","#6fbccf","#a3a06a"];
+const PENTATONIC = [1, 9/8, 5/4, 3/2, 5/3];
+function freqForStep(idx, base){
+  const octave = Math.floor(idx / PENTATONIC.length);
+  const step = idx % PENTATONIC.length;
+  return base * PENTATONIC[step] * Math.pow(2, octave);
+}
+function localStepMap(chars){
+  const m = new Map();
+  for (const ch of chars) if (!m.has(ch)) m.set(ch, m.size);
+  return m;
+}
+let audioCtx = null;
+function ensureAudio(){
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playTonePanned(freq, duration, gainVal, pan, waveform){
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const panner = audioCtx.createStereoPanner();
+  osc.type = waveform || 'sine';
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  panner.pan.setValueAtTime(pan, audioCtx.currentTime);
+  osc.connect(gain).connect(panner).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+// ---------- state ----------
+let seqA = '', seqB = '';
+let profileA = [], profileB = [];
+let selectedWindow = null;
+let profileTimer = null, detailTimerA = null, detailTimerB = null;
+
+const fileA = document.getElementById('fileA'), textA = document.getElementById('textA'), metaA = document.getElementById('metaA');
+const fileB = document.getElementById('fileB'), textB = document.getElementById('textB'), metaB = document.getElementById('metaB');
+const numWindowsSlider = document.getElementById('numWindows'), numWindowsVal = document.getElementById('numWindowsVal');
+const metricSel = document.getElementById('metric');
+const tuningSel = document.getElementById('tuning');
+const tempoSlider = document.getElementById('tempo'), tempoVal = document.getElementById('tempoVal');
+const buildBtn = document.getElementById('buildBtn');
+const overviewPanel = document.getElementById('overviewPanel');
+const skyA = document.getElementById('skyA'), skyB = document.getElementById('skyB');
+const playProfileBtn = document.getElementById('playProfileBtn'), stopProfileBtn = document.getElementById('stopProfileBtn');
+const detailPanel = document.getElementById('detailPanel');
+const detailIndexLabel = document.getElementById('detailIndexLabel');
+const detailRangeA = document.getElementById('detailRangeA'), detailRangeB = document.getElementById('detailRangeB');
+const ribbonA = document.getElementById('ribbonA'), ribbonB = document.getElementById('ribbonB');
+const playDetailBtn = document.getElementById('playDetailBtn'), stopDetailBtn = document.getElementById('stopDetailBtn');
+
+const blocksPanel = document.getElementById('blocksPanel');
+const minBlockLenSlider = document.getElementById('minBlockLen'), minBlockLenVal = document.getElementById('minBlockLenVal');
+const blockSortSel = document.getElementById('blockSort');
+const findBlocksBtn = document.getElementById('findBlocksBtn');
+const blockList = document.getElementById('blockList');
+const ticksA = document.getElementById('ticksA'), ticksB = document.getElementById('ticksB');
+let anchorChain = [];
+
+const identityBtn = document.getElementById('identityBtn');
+const identityResult = document.getElementById('identityResult');
+let currentDetailSubA = '', currentDetailSubB = '';
+
+const libraryText = document.getElementById('libraryText');
+const scanLibraryBtn = document.getElementById('scanLibraryBtn');
+const hitListA = document.getElementById('hitListA'), hitListB = document.getElementById('hitListB');
+let libraryHitsA = [], libraryHitsB = [];
+
+const remaindersPanel = document.getElementById('remaindersPanel');
+const remaindersAEl = document.getElementById('remaindersA'), remaindersBEl = document.getElementById('remaindersB');
+
+function loadFile(input, textarea, cb){
+  input.addEventListener('change', () => {
+    const f = input.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = e => { textarea.value = e.target.result; cb(); };
+    reader.readAsText(f);
+  });
+}
+loadFile(fileA, textA, () => {});
+loadFile(fileB, textB, () => {});
+
+numWindowsSlider.addEventListener('input', () => { numWindowsVal.textContent = numWindowsSlider.value; });
+tempoSlider.addEventListener('input', () => { tempoVal.textContent = tempoSlider.value; });
+metricSel.addEventListener('change', () => { if (profileA.length) renderSkylines(); });
+
+buildBtn.addEventListener('click', () => {
+  stopAll();
+  seqA = parseFastaOrRaw(textA.value);
+  seqB = parseFastaOrRaw(textB.value);
+  metaA.textContent = seqA ? seqA.length + ' symbols parsed' : 'No sequence loaded.';
+  metaB.textContent = seqB ? seqB.length + ' symbols parsed' : 'No sequence loaded.';
+  if (!seqA || !seqB){ overviewPanel.style.display = 'none'; detailPanel.style.display = 'none'; return; }
+
+  const n = parseInt(numWindowsSlider.value, 10);
+  profileA = computeWindowedProfile(seqA, n);
+  profileB = computeWindowedProfile(seqB, n);
+  overviewPanel.style.display = 'block';
+  detailPanel.style.display = 'none';
+  selectedWindow = null;
+  libraryHitsA = []; libraryHitsB = [];
+  hitListA.innerHTML = ''; hitListB.innerHTML = '';
+  identityResult.style.display = 'none';
+  renderSkylines();
+  findMatchedBlocks();
+});
+
+function renderSkylines(){
+  const metric = metricSel.value;
+  const maxVal = Math.max(
+    1,
+    ...profileA.map(w => w[metric]),
+    ...profileB.map(w => w[metric])
+  );
+  renderOneSkyline(skyA, profileA, metric, maxVal, 'var(--a-color)');
+  renderOneSkyline(skyB, profileB, metric, maxVal, 'var(--b-color)');
+}
+
+function renderOneSkyline(container, profile, metric, maxVal, color){
+  container.innerHTML = '';
+  profile.forEach((w, idx) => {
+    const bar = document.createElement('div');
+    bar.className = 'sky-bar';
+    if (selectedWindow === idx) bar.classList.add('selected');
+    const h = Math.max(2, (w[metric] / maxVal) * 100);
+    bar.style.height = h + '%';
+    bar.style.background = color;
+    bar.title = 'window ' + idx + ' — bases ' + w.start + '–' + w.end + ' — ' + metric + ': ' + w[metric].toFixed(1);
+    bar.addEventListener('click', () => selectWindow(idx));
+    container.appendChild(bar);
+  });
+}
+
+function selectWindow(idx){
+  selectedWindow = idx;
+  renderSkylines();
+  const wA = profileA[idx], wB = profileB[idx];
+  if (!wA || !wB) return;
+  detailPanel.style.display = 'block';
+  detailIndexLabel.textContent = idx;
+  detailRangeA.textContent = wA.start + '–' + wA.end;
+  detailRangeB.textContent = wB.start + '–' + wB.end;
+  buildRibbon(ribbonA, wA.sub);
+  buildRibbon(ribbonB, wB.sub);
+  currentDetailSubA = wA.sub;
+  currentDetailSubB = wB.sub;
+  identityResult.style.display = 'none';
+  detailPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function buildRibbon(container, sub, hlStart, hlEnd){
+  container.innerHTML = '';
+  container._chars = [];
+  const groups = mirrorGroups(sub);
+  const symbolIndex = new Map();
+  for (const ch of sub) if (!symbolIndex.has(ch)) symbolIndex.set(ch, symbolIndex.size);
+  let pos = 0;
+  groups.forEach(g => {
+    const depth = bracketDepth(g);
+    const grpEl = document.createElement('span');
+    grpEl.className = 'grp';
+    grpEl.dataset.depth = Math.min(depth, 2);
+    for (const ch of g){
+      const chEl = document.createElement('span');
+      chEl.className = 'ch';
+      if (hlStart !== undefined && pos >= hlStart && pos < hlEnd) chEl.classList.add('anchor-core');
+      chEl.textContent = ch;
+      chEl.style.color = PALETTE[symbolIndex.get(ch) % PALETTE.length];
+      grpEl.appendChild(chEl);
+      container._chars.push({ ch, el: chEl });
+      pos++;
+    }
+    container.appendChild(grpEl);
+    container.appendChild(document.createTextNode(' '));
+  });
+}
+
+// ---------- playback: overview profile, A left / B right ----------
+function playProfile(){
+  if (!profileA.length) return;
+  ensureAudio();
+  stopAll();
+  const metric = metricSel.value;
+  const maxVal = Math.max(1, ...profileA.map(w => w[metric]), ...profileB.map(w => w[metric]));
+  const base = parseInt(tuningSel.value, 10);
+  const interval = 1000 / parseInt(tempoSlider.value, 10);
+  const n = Math.min(profileA.length, profileB.length);
+  let i = 0;
+  function step(){
+    document.querySelectorAll('.sky-bar').forEach(b => b.style.opacity = '');
+    if (i >= n){ stopProfile(); return; }
+    const va = profileA[i][metric] / maxVal;
+    const vb = profileB[i][metric] / maxVal;
+    playTonePanned(base * (0.5 + va), interval / 1000 * 0.85, 0.18, -0.8, 'sine');
+    playTonePanned(base * (0.5 + vb), interval / 1000 * 0.85, 0.18, 0.8, 'triangle');
+    const barsA = skyA.children[i], barsB = skyB.children[i];
+    if (barsA) barsA.style.opacity = '0.5';
+    if (barsB) barsB.style.opacity = '0.5';
+    i++;
+    profileTimer = setTimeout(step, interval);
+  }
+  step();
+}
+function stopProfile(){
+  if (profileTimer) clearTimeout(profileTimer);
+  profileTimer = null;
+  document.querySelectorAll('.sky-bar').forEach(b => b.style.opacity = '');
+}
+
+// ---------- playback: detail, A left / B right, independent timers ----------
+function playDetailVoice(container, pan, waveform, tempoMs, base, timerSetter){
+  const chars = container._chars || [];
+  const steps = localStepMap(chars.map(c => c.ch));
+  let i = 0;
+  function step(){
+    chars.forEach(c => c.el.classList.remove('active'));
+    if (i >= chars.length) return;
+    const { ch, el } = chars[i];
+    el.classList.add('active');
+    const freq = freqForStep(steps.get(ch), base / 2);
+    playTonePanned(freq, tempoMs / 1000 * 0.85, 0.18, pan, waveform);
+    i++;
+    timerSetter(setTimeout(step, tempoMs));
+  }
+  step();
+}
+function playDetail(){
+  if (!ribbonA._chars || !ribbonB._chars) return;
+  ensureAudio();
+  stopAll();
+  const base = parseInt(tuningSel.value, 10);
+  const tempoMs = 1000 / parseInt(tempoSlider.value, 10);
+  playDetailVoice(ribbonA, -0.8, 'sine', tempoMs, base, t => detailTimerA = t);
+  playDetailVoice(ribbonB, 0.8, 'triangle', tempoMs, base, t => detailTimerB = t);
+}
+function stopDetail(){
+  if (detailTimerA) clearTimeout(detailTimerA);
+  if (detailTimerB) clearTimeout(detailTimerB);
+  detailTimerA = null; detailTimerB = null;
+  [ribbonA, ribbonB].forEach(c => (c._chars || []).forEach(x => x.el.classList.remove('active')));
+}
+
+function stopAll(){ stopProfile(); stopDetail(); }
+
+function renderAnchorTicks(){
+  const nA = profileA.length, nB = profileB.length;
+  ticksA.innerHTML = ''; ticksB.innerHTML = '';
+  const hitsA = new Set(), hitsB = new Set();
+  anchorChain.forEach(c => {
+    hitsA.add(Math.min(nA - 1, Math.floor(c.startA / seqA.length * nA)));
+    hitsB.add(Math.min(nB - 1, Math.floor(c.startB / seqB.length * nB)));
+  });
+  for (let i = 0; i < nA; i++){
+    const t = document.createElement('div');
+    t.className = 'anchor-tick' + (hitsA.has(i) ? ' hit' : '');
+    ticksA.appendChild(t);
+  }
+  for (let i = 0; i < nB; i++){
+    const t = document.createElement('div');
+    t.className = 'anchor-tick' + (hitsB.has(i) ? ' hit' : '');
+    ticksB.appendChild(t);
+  }
+}
+
+function renderBlockList(){
+  const sortMode = blockSortSel.value;
+  const items = anchorChain.slice();
+  if (sortMode === 'len') items.sort((x, y) => y.len - x.len);
+  else items.sort((x, y) => x.startA - y.startA);
+
+  blockList.innerHTML = '';
+  if (!items.length){
+    blockList.innerHTML = '<p class="note">No consistent matched blocks found at this length threshold. Try lowering "min block length".</p>';
+    return;
+  }
+  items.forEach(c => {
+    const drift = c.startB - c.startA;
+    const row = document.createElement('div');
+    row.className = 'block-item';
+    const preview = c.text.length > 22 ? c.text.slice(0, 22) + '…' : c.text;
+    row.innerHTML =
+      '<span>"' + preview + '" (' + c.len + ')</span>' +
+      '<span style="color:var(--a-color);">A: ' + c.startA + '–' + c.endA + '</span>' +
+      '<span style="color:var(--b-color);">B: ' + c.startB + '–' + c.endB + '</span>' +
+      '<span class="' + (drift > 0 ? 'drift-pos' : drift < 0 ? 'drift-neg' : '') + '">Δ ' + (drift > 0 ? '+' : '') + drift + '</span>';
+    row.addEventListener('click', () => jumpToAnchor(c));
+    blockList.appendChild(row);
+  });
+}
+
+function jumpToAnchor(c){
+  const pad = 15;
+  const sA = Math.max(0, c.startA - pad), eA = Math.min(seqA.length, c.endA + pad);
+  const sB = Math.max(0, c.startB - pad), eB = Math.min(seqB.length, c.endB + pad);
+  detailPanel.style.display = 'block';
+  detailIndexLabel.textContent = '(matched block)';
+  detailRangeA.textContent = sA + '–' + eA;
+  detailRangeB.textContent = sB + '–' + eB;
+  buildRibbon(ribbonA, seqA.slice(sA, eA), c.startA - sA, c.endA - sA);
+  buildRibbon(ribbonB, seqB.slice(sB, eB), c.startB - sB, c.endB - sB);
+  currentDetailSubA = seqA.slice(sA, eA);
+  currentDetailSubB = seqB.slice(sB, eB);
+  identityResult.style.display = 'none';
+  selectedWindow = null;
+  detailPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function findMatchedBlocks(){
+  if (!seqA || !seqB) return;
+  const minLen = parseInt(minBlockLenSlider.value, 10);
+  const groupsA = mirrorGroupsWithPos(seqA);
+  const groupsB = mirrorGroupsWithPos(seqB);
+  const candidates = findAnchorCandidates(groupsA, groupsB, minLen, 5, 800);
+  anchorChain = chainAnchors(candidates);
+  blocksPanel.style.display = 'block';
+  renderBlockList();
+  renderAnchorTicks();
+  renderRemainders();
+}
+
+minBlockLenSlider.addEventListener('input', () => { minBlockLenVal.textContent = minBlockLenSlider.value; });
+blockSortSel.addEventListener('change', renderBlockList);
+findBlocksBtn.addEventListener('click', findMatchedBlocks);
+playProfileBtn.addEventListener('click', playProfile);
+stopProfileBtn.addEventListener('click', stopProfile);
+playDetailBtn.addEventListener('click', playDetail);
+stopDetailBtn.addEventListener('click', stopDetail);
+</script>
+</body>
+</html>

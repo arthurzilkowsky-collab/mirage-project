@@ -1,0 +1,36 @@
+<!-- Add this into your existing animate loop inside the 3D Mirage engine -->
+<script>
+    // Cymatic audio reactivity integration
+    let analyzer = new Tone.Analyser("fft", 64);
+    // Connect destination output to analyzer
+    Tone.Destination.connect(analyzer);
+
+    function updateCymaticEnvironment() {
+        if (!isStarted) return;
+        
+        // Get frequency spectrum data
+        const values = analyzer.getValue();
+        
+        // Use average energy to modulate tunnel geometry scale and pulse rate
+        let sum = 0;
+        for (let i = 0; i < values.length; i++) {
+            sum += Math.abs(values[i]);
+        }
+        let averageEnergy = sum / values.length;
+        
+        // Normalize energy into a gentle scale factor
+        let cymaticScale = 1 + (averageEnergy + 100) * 0.002;
+        
+        nodes.forEach((node, idx) => {
+            // Pulse nodes organically based on their position and audio energy
+            let waveOffset = Math.sin(performance.now() * 0.003 + idx) * 0.1;
+            node.scale.set(
+                cymaticScale + waveOffset, 
+                cymaticScale + waveOffset, 
+                cymaticScale + waveOffset
+            );
+        });
+    }
+
+    // Call updateCymaticEnvironment() inside your main animate() loop function!
+</script>

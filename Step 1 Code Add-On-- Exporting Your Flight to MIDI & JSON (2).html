@@ -1,0 +1,54 @@
+<!-- Include Tonejs Midi Library for file generation -->
+<script src="https://unpkg.com/@tonejs/midi"></script>
+
+<div id="exportPanel" style="position: absolute; top: 20px; right: 20px; z-index: 10;">
+    <button onclick="exportFlightToMIDI()" style="background: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-size: 0.85rem;">Export Flight to MIDI</button>
+</div>
+
+<script>
+    // Array to record notes triggered during flight
+    let recordedFlightNotes = [];
+
+    // Modify your node trigger event inside animate() to record data:
+    // When a node is triggered:
+    function recordNote(freq, time) {
+        recordedFlightNotes.push({
+            midi: Tone.Frequency(freq).toMidi(),
+            time: Tone.Transport.seconds || performance.now() * 0.001,
+            duration: 0.5
+        });
+    }
+
+    function exportFlightToMIDI() {
+        if (recordedFlightNotes.length === 0) {
+            alert("No flight data recorded yet! Fly through some nodes first.");
+            return;
+        }
+
+        // Create a new Midi file instance
+        const midi = new Midi();
+        const track = midi.addTrack();
+
+        // Add recorded notes to the MIDI track
+        recordedFlightNotes.forEach(note => {
+            track.addNote({
+                midi: note.midi,
+                time: note.time,
+                duration: note.duration
+            });
+        });
+
+        // Generate binary blob and trigger browser download
+        const midiBlob = new Blob([midi.toArray()], { type: "audio/midi" });
+        const url = URL.createObjectURL(midiBlob);
+        
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Mirage_Flight_Seed_${Date.now()}.mid`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        console.log("MIDI Flight Export Successful!");
+    }
+</script>

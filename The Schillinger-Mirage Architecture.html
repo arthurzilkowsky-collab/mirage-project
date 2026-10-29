@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirage - Schillinger System Integration</title>
+    <style>
+        body {
+            margin: 0;
+            background: #090d16;
+            color: #cbd5e1;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            color: #38bdf8;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        p {
+            font-size: 0.95rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .grid {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 30px;
+        }
+        .step {
+            width: 30px;
+            height: 50px;
+            background: #1e293b;
+            border-radius: 4px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 6px;
+            font-size: 0.75rem;
+            color: #475569;
+            transition: all 0.2s ease;
+        }
+        .step.active {
+            background: #38bdf8;
+            color: #090d16;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        }
+        button {
+            background: transparent;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 10px 24px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #38bdf8;
+            color: #090d16;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Schillinger Interference Module</h1>
+        <p>Generating rhythmic permutations using cross-rhythmic resultants (3:4 pulse ratio) to drive organic, non-linear sequences.</p>
+        
+        <div class="grid" id="stepGrid">
+            <!-- Dynamically populated steps -->
+        </div>
+
+        <button id="playBtn">Activate Schillinger Stream</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+    <script>
+        const gridEl = document.getElementById('stepGrid');
+        const playBtn = document.getElementById('playBtn');
+        
+        // 3:4 Resultant pattern simulation
+        const pattern = ["pulse", "rest", "rest", "pulse", "rest", "pulse", "pulse", "rest", "rest", "pulse", "rest", "accent"];
+        
+        // Build visual grid
+        pattern.forEach((type, idx) => {
+            const div = document.createElement('div');
+            div.className = `step ${type !== 'rest' ? 'active' : ''}`;
+            div.textContent = idx + 1;
+            gridEl.appendChild(div);
+        });
+
+        let synth, loop;
+        let isPlaying = false;
+
+        async function initSynth() {
+            await Tone.start();
+            synth = new Tone.Synth({
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }
+            }).toDestination();
+
+            let index = 0;
+            loop = new Tone.Loop(time => {
+                let currentType = pattern[index % pattern.length];
+                
+                // Highlight current UI step
+                document.querySelectorAll('.step').forEach((el, i) => {
+                    el.style.borderColor = (i === index % pattern.length) ? '#ffffff' : 'transparent';
+                });
+
+                if (currentType === 'accent') {
+                    synth.triggerAttackRelease("C5", "8n", time, 1.0);
+                } else if (currentType === 'pulse') {
+                    synth.triggerAttackRelease("G4", "8n", time, 0.6);
+                }
+                
+                index++;
+            }, "16n").start(0);
+
+            Tone.Transport.bpm.value = 120;
+            Tone.Transport.start();
+        }
+
+        playBtn.addEventListener('click', async () => {
+            if (!isPlaying) {
+                await initSynth();
+                isPlaying = true;
+                playBtn.textContent = "Halt Stream";
+            } else {
+                Tone.Transport.stop();
+                if (loop) loop.dispose();
+                if (synth) synth.dispose();
+                isPlaying = false;
+                playBtn.textContent = "Activate Schillinger Stream";
+                document.querySelectorAll('.step').forEach(el => el.style.borderColor = 'transparent');
+            }
+        });
+    </script>
+</body>
+</html>

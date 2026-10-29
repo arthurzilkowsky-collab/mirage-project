@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirage - Unified Schillinger Engine</title>
+    <style>
+        body {
+            margin: 0;
+            background: #070913;
+            color: #e2e8f0;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            text-align: center;
+            max-width: 650px;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 1.4rem;
+            color: #38bdf8;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        p {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 25px;
+        }
+        canvas {
+            background: #0f172a;
+            border-radius: 12px;
+            border: 1px solid #1e293b;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 12px 28px;
+            font-size: 0.95rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+        }
+        button:hover {
+            background: #38bdf8;
+            color: #070913;
+            box-shadow: 0 0 35px rgba(56, 189, 248, 0.5);
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Schillinger Dual-System Engine</h1>
+        <p>Combining Melodic Permutation Matrices with Geometric Wave Projections for automated structural composition.</p>
+        
+        <canvas id="geoCanvas" width="500" height="180"></canvas>
+        <br>
+        <button id="toggleBtn">Engage Unified Stream</button>
+        <div id="statusText" class="status">System Standby</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+    <script>
+        const canvas = document.getElementById('geoCanvas');
+        const ctx = canvas.getContext('2d');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const statusText = document.getElementById('statusText');
+
+        let isRunning = false;
+        let synth, loop;
+        let stepIndex = 0;
+
+        // 1. Schillinger Permutation Matrix (Interval offsets from root C4)
+        const baseSeed = [0, 3, 7, 10, 14, 12];
+        const matrix = baseSeed.map((_, i) => [...baseSeed.slice(i), ...baseSeed.slice(0, i)]);
+        let currentMatrixRow = 0;
+
+        // Root frequency (C4)
+        const rootFreq = 261.63;
+
+        function semitoneToFreq(semitones) {
+            return rootFreq * Math.pow(2, semitones / 12);
+        }
+
+        function drawGeometricCurve(activeStep) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw coordinate grid lines
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            for(let x = 0; x < canvas.width; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+
+            // Draw Schillinger Geometric Pitch Projection (Sine/Parabolic Hybrid)
+            ctx.beginPath();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+
+            const row = matrix[currentMatrixRow];
+            for (let x = 0; x < canvas.width; x++) {
+                let t = x * 0.03;
+                // Geometric formula blending harmonic sine waves and rotational steps
+                let y = (canvas.height / 2) + Math.sin(t + (activeStep * 0.5)) * 40 * Math.cos(t * 0.3);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Draw active node point
+            let activeX = (activeStep * (canvas.width / row.length)) + 20;
+            let activeY = (canvas.height / 2) + Math.sin(activeStep * 0.8) * 40;
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.arc(activeX, activeY, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        async function initEngine() {
+            await Tone.start();
+            synth = new Tone.Synth({
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.02, decay: 0.3, sustain: 0.2, release: 0.5 }
+            }).toDestination();
+
+            let tick = 0;
+            loop = new Tone.Loop(time => {
+                let row = matrix[currentMatrixRow];
+                let semitone = row[stepIndex % row.length];
+                let freq = semitoneToFreq(semitone);
+
+                synth.triggerAttackRelease(freq, "8n", time);
+                drawGeometricCurve(stepIndex);
+
+                statusText.textContent = `Matrix Row ${currentMatrixRow + 1} | Step ${stepIndex + 1} | Freq: ${freq.toFixed(1)}Hz`;
+
+                stepIndex++;
+                if (stepIndex % row.length === 0) {
+                    // Shift to next Schillinger permutation row automatically
+                    currentMatrixRow = (currentMatrixRow + 1) % matrix.length;
+                }
+            }, "8n").start(0);
+
+            Tone.Transport.bpm.value = 100;
+            Tone.Transport.start();
+        }
+
+        toggleBtn.addEventListener('click', async () => {
+            if (!isRunning) {
+                await initEngine();
+                isRunning = true;
+                toggleBtn.textContent = "Disengage Stream";
+            } else {
+                Tone.Transport.stop();
+                if (loop) loop.dispose();
+                if (synth) synth.dispose();
+                isRunning = false;
+                toggleBtn.textContent = "Engage Unified Stream";
+                statusText.textContent = "System Standby";
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
+        drawGeometricCurve(0);
+    </script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirage - Resonant Toning Engine</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0b0f19;
+            color: #e2e8f0;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #canvasContainer {
+            position: relative;
+            width: 400px;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas {
+            position: absolute;
+            border-radius: 50%;
+        }
+        .controls {
+            margin-top: 30px;
+            z-index: 10;
+            text-align: center;
+        }
+        button {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+        }
+        button:hover {
+            background: #38bdf8;
+            color: #0b0f19;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.5);
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvasContainer">
+        <canvas id="resonanceCanvas" width="400" height="400"></canvas>
+    </div>
+
+    <div class="controls">
+        <button id="toggleBtn">Initiate Tone (OM)</button>
+        <div id="statusText" class="status">Idle — Awaiting Resonance</div>
+    </div>
+
+    <!-- Tone.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+    <script>
+        const canvas = document.getElementById('resonanceCanvas');
+        const ctx = canvas.getContext('2d');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const statusText = document.getElementById('statusText');
+
+        let isRunning = false;
+        let baseOsc, lfo, filter;
+        let overtones = [];
+        let breathScale = 1.0;
+
+        // Base frequency (e.g., 136.1 Hz - Cosmic OM, or adjust to 230 Hz for Bee)
+        const baseFreq = 136.1; 
+
+        async function setupAudio() {
+            await Tone.start();
+            
+            // Low-pass filter for warmth
+            filter = new Tone.Filter({
+                frequency: 400,
+                type: "lowpass"
+            }).toDestination();
+
+            // Breathing LFO to modulate filter frequency (simulating breath cycle)
+            lfo = new Tone.LFO({
+                frequency: 0.12, // ~8 second breath cycle
+                min: 200,
+                max: 1200
+            }).start();
+            lfo.connect(filter.frequency);
+
+            // Core Fundamental Oscillator
+            baseOsc = new Tone.Oscillator(baseFreq, "sine").connect(filter);
+            baseOsc.volume.value = -10;
+            baseOsc.start();
+
+            // Spawn evolving harmonic overtones over time
+            overtones = [];
+            for (let i = 2; i <= 6; i++) {
+                setTimeout(() => {
+                    if (!isRunning) return;
+                    const overtone = new Tone.Oscillator(baseFreq * i, i % 2 === 0 ? "sine" : "triangle");
+                    overtone.volume.value = -22 - (i * 4); // softer higher harmonics
+                    overtone.connect(filter);
+                    overtone.start();
+                    overtones.push(overtone);
+                    statusText.textContent = `Harmonic Layer ${i} Unlocked`;
+                }, i * 3500); // Bloom every 3.5 seconds
+            }
+        }
+
+        function stopAudio() {
+            if (baseOsc) baseOsc.stop().dispose();
+            if (lfo) lfo.stop().dispose();
+            if (filter) filter.dispose();
+            overtones.forEach(o => o.stop().dispose());
+            overtones = [];
+        }
+
+        // Visual animation loop representing frequency ripple & breath
+        function drawVisualizer() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            if (isRunning) {
+                // Pulse scale based on time (breath rhythm)
+                const time = Date.now() * 0.001;
+                breathScale = 1 + Math.sin(time * 1.5) * 0.08;
+            } else {
+                breathScale += (1 - breathScale) * 0.1; // return to normal smoothly
+            }
+
+            // Draw expanding concentric resonance rings
+            for (let i = 4; i > 0; i--) {
+                const radius = (60 + i * 35) * breathScale;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(56, 189, 248, ${israelOpacity(i, isRunning)})`;
+                ctx.lineWidth = isRunning ? 2 : 1;
+                ctx.stroke();
+            }
+
+            // Center core glow
+            const gradient = ctx.createRadialGradient(centerX, centerY, 5, centerX, centerY, 80 * breathScale);
+            gradient.addColorStop(0, isRunning ? 'rgba(56, 189, 248, 0.8)' : 'rgba(148, 163, 184, 0.2)');
+            gradient.addColorStop(1, 'rgba(11, 15, 25, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 80 * breathScale, 0, Math.PI * 2);
+            ctx.fill();
+
+            requestAnimationFrame(drawVisualizer);
+        }
+
+        function israelOpacity(index, active) {
+            if (!active) return 0.05;
+            return 0.15 + (index * 0.08) + (Math.sin(Date.now() * 0.003 + index) * 0.05);
+        }
+
+        toggleBtn.addEventListener('click', async () => {
+            if (!isRunning) {
+                await setupAudio();
+                isRunning = true;
+                toggleBtn.textContent = "Silence Resonance";
+                statusText.textContent = "Harmonizing — Emitting Core Seed";
+            } else {
+                stopAudio();
+                isRunning = false;
+                toggleBtn.textContent = "Initiate Tone (OM)";
+                statusText.textContent = "Idle — Awaiting Resonance";
+            }
+        });
+
+        // Start visual loop immediately
+        drawVisualizer();
+    </script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirage - Production Architecture Engine</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #02040a;
+            font-family: system-ui, -apple-system, sans-serif;
+            color: #f8fafc;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 5px 0;
+            color: #38bdf8;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        p {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin: 0;
+        }
+        #launchScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(2, 4, 10, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s ease;
+        }
+        button {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 12px 28px;
+            font-size: 1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #38bdf8;
+            color: #02040a;
+            box-shadow: 0 0 50px rgba(56, 189, 248, 0.6);
+        }
+        .control-panel {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid #38bdf8;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="launchScreen">
+        <button id="startBtn">Engage Mirage Engine</button>
+    </div>
+
+    <div id="ui">
+        <h1>Mirage Matrix</h1>
+        <p>Controls: WASD to Move | Mouse to Look | Cymatic Reactivity Active</p>
+    </div>
+
+    <!-- Inspector & DNA UI -->
+    <div class="control-panel" style="bottom: 20px; left: 20px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 0.85rem; color: #38bdf8; letter-spacing: 1px;">Seed Inspector & DNA Morph</h3>
+        <p id="currentProfileText" style="font-size: 0.75rem; color: #94a3b8; margin: 0 0 10px 0;">Profile: Schillinger Rotation</p>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button onclick="setTuningProfile('Schillinger')" style="padding: 5px 10px; font-size: 0.75rem;">Schillinger</button>
+            <button onclick="setTuningProfile('GoldenRatio')" style="padding: 5px 10px; font-size: 0.75rem;">Golden Ratio</button>
+            <button onclick="setTuningProfile('Pythagorean')" style="padding: 5px 10px; font-size: 0.75rem;">Pythagorean</button>
+        </div>
+        <input type="text" id="dnaInput" value="ATGCGATCGATCGTACGGAT" style="background: #02040a; border: 1px solid #475569; color: #38bdf8; padding: 6px; border-radius: 4px; font-family: monospace; width: 170px; font-size: 0.75rem;" />
+        <button onclick="applyDNASeed()" style="margin-top: 8px; width: 100%; padding: 5px; font-size: 0.75rem;">Morph to DNA</button>
+    </div>
+
+    <!-- Export Panel -->
+    <div style="position: absolute; top: 20px; right: 20px; z-index: 10;">
+        <button onclick="exportFlightToMIDI()" style="padding: 10px 20px; font-size: 0.85rem;">Export Flight to MIDI</button>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
+
+    <script>
+        let scene, camera, renderer;
+        let synth, analyzer, isStarted = false;
+        let nodes = [];
+        let recordedFlightNotes = [];
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let prevTime = performance.now();
+
+        const matrix = [
+            [0, 3, 7, 10],
+            [3, 7, 10, 14],
+            [7, 10, 14, 17],
+            [10, 14, 17, 21]
+        ];
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x02040a, 0.035);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const pointLight = new THREE.PointLight(0x38bdf8, 2, 50);
+            camera.add(pointLight);
+            scene.add(camera);
+
+            createTunnel();
+
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', (e) => handleKey(e, true));
+            document.addEventListener('keyup', (e) => handleKey(e, false));
+            renderer.domElement.addEventListener('click', () => {
+                if (isStarted) renderer.domElement.requestPointerLock();
+            });
+            document.addEventListener('mousemove', onMouseMove);
+        }
+
+        function createTunnel() {
+            const geometry = new THREE.IcosahedronGeometry(0.8, 0);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8, wireframe: true, emissive: 0x0284c7, emissiveIntensity: 0.5
+            });
+
+            for (let i = 0; i < 150; i++) {
+                let angle = i * 0.3;
+                let x = Math.cos(angle) * 6;
+                let y = Math.sin(angle) * 6;
+                let z = -i * 3;
+
+                let mesh = new THREE.Mesh(geometry, material.clone());
+                mesh.position.set(x, y, z);
+                mesh.userData = {
+                    freq: 220 * Math.pow(2, matrix[i % matrix.length][i % 4] / 12),
+                    triggered: false
+                };
+                scene.add(mesh);
+                nodes.push(mesh);
+            }
+        }
+
+        function handleKey(e, isDown) {
+            switch (e.code) {
+                case 'KeyW': moveForward = isDown; break;
+                case 'KeyS': moveBackward = isDown; break;
+                case 'KeyA': moveLeft = isDown; break;
+                case 'KeyD': moveRight = isDown; break;
+            }
+        }
+
+        let euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        function onMouseMove(e) {
+            if (document.pointerLockElement !== renderer.domElement) return;
+            euler.setFromQuaternion(camera.quaternion);
+            euler.y -= e.movementX * 0.002;
+            euler.x -= e.movementY * 0.002;
+            euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
+            camera.quaternion.setFromEuler(euler);
+        }
+
+        async function initAudio() {
+            await Tone.start();
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.05, decay: 0.4, sustain: 0.1, release: 1.2 }
+            });
+            
+            analyzer = new Tone.Analyser("fft", 64);
+            synth.connect(analyzer);
+            analyzer.toDestination();
+            synth.volume.value = -8;
+        }
+
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            await initAudio();
+            document.getElementById('launchScreen').style.opacity = '0';
+            setTimeout(() => document.getElementById('launchScreen').remove(), 500);
+            renderer.domElement.requestPointerLock();
+            isStarted = true;
+            animate();
+        });
+
+        function setTuningProfile(profile) {
+            document.getElementById('currentProfileText').textContent = `Profile: ${profile}`;
+            nodes.forEach((node, i) => {
+                let semitones = 0;
+                if (profile === 'Schillinger') semitones = matrix[i % matrix.length][i % 4];
+                else if (profile === 'GoldenRatio') semitones = Math.floor((i % 12) * 1.618);
+                else if (profile === 'Pythagorean') semitones = [0, 2, 4, 7, 9][i % 5];
+                
+                node.userData.freq = 220 * Math.pow(2, semitones / 12);
+                node.material.color.setHex(profile === 'Schillinger' ? 0x38bdf8 : profile === 'GoldenRatio' ? 0x10b981 : 0xf59e0b);
+            });
+        }
+
+        function applyDNASeed() {
+            const seq = document.getElementById('dnaInput').value.toUpperCase();
+            const baseMap = { 'A': 0, 'T': 3, 'C': 7, 'G': 10 };
+            let intervals = [];
+            for (let i = 0; i < seq.length; i += 3) {
+                let base = seq[i];
+                if (baseMap[base] !== undefined) intervals.push(baseMap[base]);
+            }
+            if (intervals.length === 0) intervals = [0, 3, 7, 10];
+
+            nodes.forEach((node, i) => {
+                let semitone = intervals[i % intervals.length];
+                node.userData.freq = 220 * Math.pow(2, semitone / 12);
+                node.material.color.setHex(0xec4899);
+            });
+        }
+
+        function exportFlightToMIDI() {
+            if (recordedFlightNotes.length === 0) {
+                alert("No flight data recorded yet! Fly through nodes first.");
+                return;
+            }
+            const midi = new Midi();
+            const track = midi.addTrack();
+            recordedFlightNotes.forEach(note => track.addNote(note));
+            
+            const blob = new Blob([midi.toArray()], { type: "audio/midi" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Mirage_Flight_${Date.now()}.mid`;
+            a.click();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isStarted) return;
+
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+
+            camera.translateZ(velocity.z * delta);
+            camera.translateX(velocity.x * delta);
+
+            // Cymatic audio reactivity
+            const fftValues = analyzer.getValue();
+            let avgEnergy = 0;
+            for (let i = 0; i < fftValues.length; i++) avgEnergy += Math.abs(fftValues[i]);
+            let cymaticScale = 1 + (avgEnergy / fftValues.length + 100) * 0.0015;
+
+            nodes.forEach((node, idx) => {
+                let dist = camera.position.distanceTo(node.position);
+                if (dist < 3.5 && !node.userData.triggered) {
+                    synth.triggerAttackRelease(node.userData.freq, "4n");
+                    recordedFlightNotes.push({
+                        midi: Tone.Frequency(node.userData.freq).toMidi(),
+                        time: Tone.Transport.seconds || performance.now() * 0.001,
+                        duration: 0.5
+                    });
+                    node.material.emissive.setHex(0xf43f5e);
+                    node.userData.triggered = true;
+                }
+
+                let wave = Math.sin(time * 0.003 + idx) * 0.1;
+                node.scale.set(cymaticScale + wave, cymaticScale + wave, cymaticScale + wave);
+
+                if (node.position.z > camera.position.z + 10) {
+                    node.position.z -= 150 * 3;
+                    node.userData.triggered = false;
+                    node.material.emissive.setHex(0x0284c7);
+                }
+            });
+
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>

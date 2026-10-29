@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirage - 3D Schillinger Flight Toy</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #02040a;
+            font-family: system-ui, -apple-system, sans-serif;
+            color: #f8fafc;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 5px 0;
+            color: #38bdf8;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        p {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin: 0;
+        }
+        #launchScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(2, 4, 10, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s ease;
+        }
+        button {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 15px 35px;
+            font-size: 1.1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #38bdf8;
+            color: #02040a;
+            box-shadow: 0 0 50px rgba(56, 189, 248, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="launchScreen">
+        <button id="startBtn">Enter Mirage Flight Engine</button>
+    </div>
+
+    <div id="ui">
+        <h1>Mirage Matrix</h1>
+        <p>Controls: WASD to Move | Mouse to Look | Fly through nodes to trigger Schillinger sequences.</p>
+    </div>
+
+    <!-- Three.js & Tone.js Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+
+    <script>
+        let scene, camera, renderer;
+        let synth, isStarted = false;
+        let nodes = [];
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let prevTime = performance.now();
+
+        // Schillinger Matrix Seed
+        const matrix = [
+            [0, 3, 7, 10],
+            [3, 7, 10, 14],
+            [7, 10, 14, 17],
+            [10, 14, 17, 21]
+        ];
+        const rootFreq = 220.0; // A3 base
+
+        function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x02040a, 0.035);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0x38bdf8, 2, 50);
+            camera.add(pointLight);
+            scene.add(camera);
+
+            // Generate Geometric Schillinger Space Nodes (Tunnel of Permutations)
+            createGeometricTunnel();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            
+            // Pointer lock for immersive mouse look
+            renderer.domElement.addEventListener('click', () => {
+                if (isStarted) renderer.domElement.requestPointerLock();
+            });
+
+            document.addEventListener('mousemove', onMouseMove);
+        }
+
+        function createGeometricTunnel() {
+            const geometry = new THREE.IcosahedronGeometry(0.8, 0);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                wireframe: true,
+                emissive: 0x0284c7,
+                emissiveIntensity: 0.5
+            });
+
+            // Scatter nodes along a 3D Schillinger spiral trajectory
+            for (let i = 0; i < 150; i++) {
+                let angle = i * 0.3;
+                let radius = 6;
+                let x = Math.cos(angle) * radius;
+                let y = Math.sin(angle) * radius;
+                let z = -i * 3;
+
+                let mesh = new THREE.Mesh(geometry, material.clone());
+                mesh.position.set(x, y, z);
+                
+                // Assign a Schillinger pitch index to each node
+                mesh.userData = {
+                    freq: rootFreq * Math.pow(2, matrix[i % matrix.length][i % 4] / 12),
+                    triggered: false,
+                    id: i
+                };
+
+                scene.add(mesh);
+                nodes.push(mesh);
+            }
+        }
+
+        // Flight controls (WASD)
+        function onKeyDown(e) {
+            switch (e.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyD': moveRight = true; break;
+            }
+        }
+        function onKeyUp(e) {
+            switch (e.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyD': moveRight = false; break;
+            }
+        }
+
+        let euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        function onMouseMove(e) {
+            if (document.pointerLockElement !== renderer.domElement) return;
+            const movementX = e.movementX || e.mozMovementX || 0;
+            const movementY = e.movementY || e.mozMovementY || 0;
+
+            euler.setFromQuaternion(camera.quaternion);
+            euler.y -= movementX * 0.002;
+            euler.x -= movementY * 0.002;
+            euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
+            camera.quaternion.setFromEuler(euler);
+        }
+
+        async function initAudio() {
+            await Tone.start();
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.05, decay: 0.4, sustain: 0.1, release: 1.2 }
+            }).toDestination();
+            synth.volume.value = -8;
+        }
+
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            await initAudio();
+            document.getElementById('launchScreen').style.opacity = '0';
+            setTimeout(() => document.getElementById('launchScreen').remove(), 500);
+            renderer.domElement.requestPointerLock();
+            isStarted = true;
+            animate();
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!isStarted) return;
+
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+
+            // Smooth movement physics
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+
+            camera.translateZ(velocity.z * delta);
+            camera.translateX(velocity.x * delta);
+
+            // Loop tunnel forward infinitely
+            nodes.forEach(node => {
+                // Check distance between camera and node for spatial triggering
+                let dist = camera.position.distanceTo(node.position);
+                if (dist < 3.5) {
+                    if (!node.userData.triggered) {
+                        synth.triggerAttackRelease(node.userData.freq, "4n");
+                        node.material.emissive.setHex(0xf43f5e); // Flash red/pink on touch
+                        node.userData.triggered = true;
+                    }
+                }
+
+                // If node is far behind camera, recycle it forward to create infinite flight
+                if (node.position.z > camera.position.z + 10) {
+                    node.position.z -= 150 * 3;
+                    node.userData.triggered = false;
+                    node.material.emissive.setHex(0x0284c7);
+                }
+            });
+
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>

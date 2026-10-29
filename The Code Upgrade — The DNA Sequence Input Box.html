@@ -1,0 +1,35 @@
+<!-- DNA Sequence Input Overlay -->
+<div id="dnaPanel" style="position: absolute; top: 70px; left: 20px; background: rgba(15, 23, 42, 0.85); border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; z-index: 10; backdrop-filter: blur(5px);">
+    <h3 style="margin: 0 0 8px 0; font-size: 0.85rem; color: #38bdf8; letter-spacing: 1px;">Genetic Codon Stream</h3>
+    <input type="text" id="dnaInput" value="ATGCGATCGATCGTACGGAT" style="background: #02040a; border: 1px solid #475569; color: #38bdf8; padding: 6px; border-radius: 4px; font-family: monospace; width: 180px; font-size: 0.75rem;" />
+    <button onclick="applyDNASeed()" style="margin-top: 8px; width: 100%; padding: 5px; font-size: 0.75rem; border-radius: 10px;">Morph Tunnel to DNA</button>
+</div>
+
+<script>
+    function translateDNAtoMelody(dnaString) {
+        const baseMap = { 'A': 0, 'T': 3, 'C': 7, 'G': 10 };
+        let intervals = [];
+        for (let i = 0; i < dnaString.length; i += 3) {
+            let codon = dnaString.substr(i, 3).toUpperCase();
+            let base = codon[0];
+            if (baseMap[base] !== undefined) {
+                intervals.push(baseMap[base]);
+            }
+        }
+        return intervals.length > 0 ? intervals : [0, 3, 7, 10]; // fallback
+    }
+
+    function applyDNASeed() {
+        const seq = document.getElementById('dnaInput').value;
+        const customSeed = translateDNAtoMelody(seq);
+        
+        // Re-map nodes with the new DNA-derived intervals
+        nodes.forEach((node, i) => {
+            let semitone = customSeed[i % customSeed.length];
+            node.userData.freq = 220 * Math.pow(2, semitone / 12);
+            node.material.color.setHex(0xec4899); // Hot pink/magenta for biological DNA mode!
+        });
+        
+        console.log("Tunnel mutated using custom DNA sequence:", customSeed);
+    }
+</script>

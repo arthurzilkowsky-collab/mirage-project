@@ -1,0 +1,43 @@
+<!-- Add this UI overlay inside the HTML body of our 3D engine -->
+<div id="inspectorPanel" style="position: absolute; bottom: 20px; left: 20px; background: rgba(15, 23, 42, 0.85); border: 1px solid #38bdf8; padding: 15px; border-radius: 10px; z-index: 10; backdrop-filter: blur(5px);">
+    <h3 style="margin: 0 0 10px 0; font-size: 0.9rem; color: #38bdf8; letter-spacing: 1px;">Seed Inspector & DNA Morph</h3>
+    <p id="currentProfileText" style="font-size: 0.75rem; color: #94a3b8; margin: 0 0 10px 0;">Active Profile: Schillinger Rotation</p>
+    <div style="display: flex; gap: 8px;">
+        <button onclick="setTuningProfile('Schillinger')" style="padding: 6px 12px; font-size: 0.75rem; border-radius: 15px;">Schillinger</button>
+        <button onclick="setTuningProfile('GoldenRatio')" style="padding: 6px 12px; font-size: 0.75rem; border-radius: 15px;">Golden Ratio</button>
+        <button onclick="setTuningProfile('Pythagorean')" style="padding: 6px 12px; font-size: 0.75rem; border-radius: 15px;">Pythagorean</button>
+    </div>
+</div>
+
+<script>
+    // Global tuning profile state for our nodes
+    let activeTuningName = "Schillinger";
+    
+    function setTuningProfile(profile) {
+        activeTuningName = profile;
+        document.getElementById('currentProfileText').textContent = `Active Profile: ${profile}`;
+        
+        // Mutate existing nodes dynamically based on selected profile
+        nodes.forEach((node, i) => {
+            let base = 220;
+            let semitones = 0;
+            
+            if (profile === 'Schillinger') {
+                semitones = matrix[i % matrix.length][i % 4];
+            } else if (profile === 'GoldenRatio') {
+                semitones = Math.floor((i % 12) * 1.618);
+            } else if (profile === 'Pythagorean') {
+                // Pure 3:2 overtone intervals mapped to semitones roughly
+                const pyth = [0, 2, 4, 7, 9];
+                semitones = pyth[i % pyth.length];
+            }
+            
+            node.userData.freq = base * Math.pow(2, semitones / 12);
+            
+            // Visual color shift to indicate mutation
+            if (profile === 'Schillinger') node.material.color.setHex(0x38bdf8);
+            if (profile === 'GoldenRatio') node.material.color.setHex(0x10b981); // Emerald
+            if (profile === 'Pythagorean') node.material.color.setHex(0xf59e0b); // Amber
+        });
+    }
+</script>

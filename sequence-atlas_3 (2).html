@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sequence Atlas — segment, map, and hear a sequence</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #14171c;
+    --panel: #1c2129;
+    --panel-2: #20262f;
+    --line: #2b323d;
+    --ink: #eae7de;
+    --muted: #7d8590;
+    --amber: #e8a33d;
+    --teal: #5fb3a3;
+    --font-ui: 'Space Grotesk', sans-serif;
+    --font-data: 'IBM Plex Mono', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    padding: 28px 28px 40px;
+  }
+
+  .wrap{ max-width: 980px; margin: 0 auto; }
+
+  header{ margin-bottom: 22px; }
+  h1{
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+  }
+  header p{
+    margin: 0;
+    color: var(--muted);
+    font-size: 14.5px;
+    max-width: 62ch;
+    line-height: 1.5;
+  }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+
+  .controls{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: flex-end;
+  }
+  .field{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field label{
+    font-size: 12px;
+    color: var(--muted);
+  }
+  select, input[type="range"], textarea, button{
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--ink);
+  }
+  select{
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    min-width: 150px;
+  }
+  input[type="range"]{
+    width: 140px;
+    accent-color: var(--amber);
+  }
+  textarea{
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: var(--font-data);
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 64px;
+  }
+  .range-val{ font-size: 12px; color: var(--ink); font-family: var(--font-data); }
+
+  .btn{
+    background: transparent;
+    border: 1px solid var(--amber);
+    color: var(--amber);
+    border-radius: 6px;
+    padding: 9px 16px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn:hover{ background: var(--amber); color: #1a1305; }
+  .btn:focus-visible, select:focus-visible, textarea:focus-visible{
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
+  .btn.stop{ border-color: var(--muted); color: var(--muted); }
+  .btn.stop:hover{ background: var(--muted); color: #14171c; }
+
+  .custom-box{ display: none; margin-top: 14px; }
+  .custom-box.show{ display: block; }
+
+  .ribbon-shell{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .ribbon-title{
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .ribbon{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 5px;
+    font-family: var(--font-data);
+    line-height: 1;
+  }
+  .group{
+    display: inline-flex;
+    padding: 5px 3px;
+    border-radius: 5px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    transition: border-color 0.1s, box-shadow 0.1s, background 0.1s;
+    cursor: pointer;
+  }
+  .group:hover{ background: #262d38; }
+  .group.selected{
+    outline: 2px solid var(--amber);
+    outline-offset: 1px;
+  }
+  .group[data-depth="1"]{ border-color: rgba(95,179,163,0.45); }
+  .group[data-depth="2"]{ border-color: rgba(95,179,163,0.7); box-shadow: 0 0 0 1px rgba(95,179,163,0.25) inset; }
+  .group[data-depth="3"], .group[data-depth="4"], .group[data-depth="5"]{
+    border-color: var(--teal); box-shadow: 0 0 0 2px rgba(95,179,163,0.3) inset;
+  }
+  .ch{
+    padding: 1px 1px;
+    font-size: 14px;
+  }
+  .ch.active{
+    background: var(--amber);
+    color: #1a1305;
+    border-radius: 2px;
+  }
+  .mirror{
+    color: var(--muted);
+    align-self: center;
+    font-size: 13px;
+    margin: 0 1px;
+    transition: color 0.1s;
+  }
+  .mirror.pulse{ color: var(--amber); }
+
+  .ch.iso-active{
+    background: var(--teal);
+    color: #0c1a17;
+    border-radius: 2px;
+  }
+
+  .interfere-timeline{
+    display: flex;
+    gap: 2px;
+    margin-top: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .iblock{
+    height: 30px;
+    min-width: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 4px;
+    color: #0c1015;
+    opacity: 0.82;
+    flex-shrink: 0;
+    font-family: var(--font-data);
+    transition: opacity 0.1s, box-shadow 0.1s;
+  }
+  .iblock.active{
+    opacity: 1;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.35) inset;
+  }
+  .iwarn{
+    color: var(--amber);
+    font-size: 12.5px;
+    margin-top: 10px;
+  }
+
+  .ch.pam{
+    text-decoration: underline;
+    text-decoration-color: var(--amber);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
+  }
+
+  .legend{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+  .legend-item{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-data);
+  }
+  .swatch{
+    width: 11px; height: 11px; border-radius: 3px; display: inline-block;
+  }
+
+  .stats{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 14px;
+  }
+  .stat .num{
+    font-family: var(--font-data);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--amber);
+  }
+  .stat .label{
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .note{
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-top: 4px;
+  }
+
+  @media (max-width: 600px){
+    body{ padding: 18px 14px 30px; }
+    h1{ font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Sequence Atlas</h1>
+    <p>Paste a sequence — digits of π, DNA, or anything else — and it gets split every time two identical symbols land next to each other. Play the whole thing (with a rest at each split), or click any one group to isolate it and evolve it using Schillinger-style transformations: retrograde, circular permutation, inversion, augmentation/diminution.</p>
+  </header>
+
+  <div class="panel">
+    <div class="controls">
+      <div class="field">
+        <label for="source">Source</label>
+        <select id="source">
+          <option value="pi">Digits of π</option>
+          <option value="dna">DNA sample (human mtDNA)</option>
+          <option value="custom">Paste your own</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="length">Length used: <span id="lengthVal" class="range-val">300</span></label>
+        <input type="range" id="length" min="20" max="750" step="10" value="300">
+      </div>
+
+      <div class="field">
+        <label for="tuning">Tuning</label>
+        <select id="tuning">
+          <option value="440">440 Hz standard</option>
+          <option value="432">432 Hz alternate</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="tempo">Tempo: <span id="tempoVal" class="range-val">6</span> notes/sec</label>
+        <input type="range" id="tempo" min="2" max="14" step="1" value="6">
+      </div>
+
+      <div class="field">
+        <label for="mirrorMode">At each mirror</label>
+        <select id="mirrorMode">
+          <option value="rest" selected>Rest (silence)</option>
+          <option value="click">Click</option>
+          <option value="none">Nothing (continue)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="pamToggle">Cas9 PAM sites</label>
+        <select id="pamToggle">
+          <option value="off" selected>Off</option>
+          <option value="on">Highlight NGG</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <button class="btn" id="playBtn">▶ Play all</button>
+      </div>
+      <div class="field">
+        <button class="btn" id="downloadWavBtn">⬇ Download WAV</button>
+      </div>
+      <div class="field">
+        <button class="btn stop" id="stopBtn">■ Stop</button>
+      </div>
+    </div>
+
+    <div class="custom-box" id="customBox">
+      <div class="field" style="width:100%;">
+        <label for="customText">Your sequence (non-letters/digits are stripped)</label>
+        <textarea id="customText" placeholder="Paste digits, DNA bases, or any text here…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="ribbon-shell">
+    <div class="ribbon-title">Mirror groups — each block ends where a symbol repeats; the teal ring shows nested palindrome depth</div>
+    <div class="ribbon" id="ribbon"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="panel" id="isolatePanel" style="display:none;">
+    <div class="controls" style="margin-bottom:14px;">
+      <div class="field" style="max-width:100%;">
+        <label>Isolated group <span id="isoGroupLabel" class="range-val"></span></label>
+        <div class="ribbon" id="isoRibbon" style="margin-top:4px;"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="field">
+        <label for="isoOrder">Order (permutation)</label>
+        <select id="isoOrder">
+          <option value="none">None</option>
+          <option value="retrograde">Retrograde (reverse)</option>
+          <option value="circular">Circular permutation</option>
+        </select>
+      </div>
+      <div class="field" id="isoRotateField" style="display:none;">
+        <label for="isoRotate">Rotate by: <span id="isoRotateVal" class="range-val">1</span></label>
+        <input type="range" id="isoRotate" min="1" max="8" step="1" value="1">
+      </div>
+      <div class="field">
+        <label for="isoInvert">Pitch</label>
+        <select id="isoInvert">
+          <option value="no">Normal</option>
+          <option value="yes">Inverted (contour flipped)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="isoDuration">Duration</label>
+        <select id="isoDuration">
+          <option value="0.5">Diminution (0.5×)</option>
+          <option value="1" selected>Normal (1×)</option>
+          <option value="2">Augmentation (2×)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="isoWave">Waveform</label>
+        <select id="isoWave">
+          <option value="sine">Sine</option>
+          <option value="triangle">Triangle</option>
+          <option value="square">Square</option>
+          <option value="sawtooth">Sawtooth</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="isoOctave">Octave shift: <span id="isoOctaveVal" class="range-val">0</span></label>
+        <input type="range" id="isoOctave" min="-2" max="2" step="1" value="0">
+      </div>
+      <div class="field">
+        <label for="isoLoop">Loop</label>
+        <select id="isoLoop">
+          <option value="yes" selected>Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="field">
+        <button class="btn" id="isoPlayBtn">▶ Play isolated</button>
+      </div>
+      <div class="field">
+        <button class="btn stop" id="isoStopBtn">■ Stop</button>
+      </div>
+      <div class="field">
+        <button class="btn stop" id="isoCloseBtn">Close</button>
+      </div>
+    </div>
+    <p class="note">These are Schillinger's own devices for evolving a short cell into new material: circular permutation rotates it, retrograde reverses it, inversion flips its melodic contour around its own axis, and augmentation/diminution stretches or compresses its durations. Combine retrograde with inversion for a classic "retrograde inversion."</p>
+  </div>
+
+  <div class="panel" id="interferePanel">
+    <div class="ribbon-title" style="margin-bottom:14px;">Interference — a resultant rhythm from two generators</div>
+    <div class="controls">
+      <div class="field">
+        <label for="genASelect">Generator A: group</label>
+        <select id="genASelect"></select>
+      </div>
+      <div class="field">
+        <label for="genAnum">Generator A: value</label>
+        <input type="number" id="genAnum" min="1" max="24" value="2" style="width:70px; background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px; color:var(--ink);">
+      </div>
+      <div class="field">
+        <label for="genBSelect">Generator B: group</label>
+        <select id="genBSelect"></select>
+      </div>
+      <div class="field">
+        <label for="genBnum">Generator B: value</label>
+        <input type="number" id="genBnum" min="1" max="24" value="3" style="width:70px; background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px; color:var(--ink);">
+      </div>
+      <div class="field">
+        <label for="interfereLoop">Loop</label>
+        <select id="interfereLoop">
+          <option value="yes" selected>Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="field">
+        <button class="btn" id="genBtn">Generate resultant</button>
+      </div>
+      <div class="field">
+        <button class="btn" id="interferePlayBtn">▶ Play resultant</button>
+      </div>
+      <div class="field">
+        <button class="btn stop" id="interfereStopBtn">■ Stop</button>
+      </div>
+    </div>
+
+    <div id="interfereOutput"></div>
+
+    <p class="note">Two generators — think of them as two clocks ticking at different rates, started together. Every point where either clock ticks becomes a beat; the gaps between beats become the resultant rhythm. Where both clocks land on the same beat, you hear both groups at once. Voice B plays an octave up so the two stay distinguishable. The generator values default to the two groups' lengths, but you can type any integers you like — that's how Schillinger used the technique.</p>
+  </div>
+
+  <div class="panel">
+    <div class="stats" id="stats"></div>
+    <p class="note">This is a structural view, not a statistical or predictive one — it shows where repeats occur and how symbols nest, nothing more. "Coherence" here just means fewer, longer groups.</p>
+  </div>
+
+</div>
+
+<script>
+// ---------- data sources ----------
+const PI_DIGITS = "3" + "14159265358979323846264338327950288419716939937510" +
+  "58209749445923078164062862089986280348253421170679" +
+  "82148086513282306647093844609550582231725359408128" +
+  "48111745028410270193852110555964462294895493038196" +
+  "44288109756659334461284756482337867831652712019091" +
+  "45648566923460348610454326648213393607260249141273" +
+  "72458700660631558817488152092096282925409171536436" +
+  "78925903600113305305488204665213841469519415116094" +
+  "33057270365759591953092186117381932611793105118548" +
+  "07446237996274956735188575272489122793818301194912" +
+  "98336733624406566430860213949463952247371907021798" +
+  "60943702770539217176293176752384674818467669405132" +
+  "00056812714526356082778577134275778960917363717872" +
+  "14684409012249534301465495853710507922796892589235" +
+  "42019956112129021960864034418159813629774771309960";
+
+const DNA_SAMPLE = "GATCACAGGTCTATCACCCTATTAACCACTCACGGGAGCTCTCCATGCATTTGGTATTTTCGTCTGGGGGGTATGCACGCGATAGCATTGCGAGACGCTGGAGCCGGAGCACCCTATGTCGCAGTATCTGTCTTTGATTCCTGCCTCATCCTATTATTTATCGCACCTACGTTCAATATTACAGGCGAACATACTTACTAAAGTGTGTTAATTAATTAATGCTTGTAGGACATAATAATAACAATTGAATGTCTGCACAGCCACTTTCCACACAGACATCATAACAAAAAATTTCCACCAAACCCCCCCTCCCCCGCTTCTGGCCACAGCACTTAAACACATCTCTGCCAAACCCCAAAAACAAAGAACCCTAACACCAGCCTAACCAGATTTCAAATTTTATCTTTTGGCGGTATGCACTTTTAACAGTCACCCCCCAACTAACACATTATTTTCCCCTCCCACTCCCATACTACTAATCTCATCAATACAACCCCCGCCCATCCTACCCAGCACACACACACCGCTGCTAACCCCATACCCCGAACCAACCAAACCCCAAAGACACC";
+
+// ---------- palette ----------
+const PALETTE = ["#e8a33d","#5fb3a3","#c97b8a","#7b9fd4","#d4b85f","#8fbf6b","#b088c9","#e0806a","#6fbccf","#a3a06a"];
+
+function colorFor(symbolIndexMap, ch){
+  return PALETTE[symbolIndexMap.get(ch) % PALETTE.length];
+}
+
+// ---------- mirror grouping ----------
+function mirrorGroups(seq){
+  if (!seq.length) return [];
+  const groups = [];
+  let current = seq[0];
+  for (let i = 1; i < seq.length; i++){
+    const ch = seq[i];
+    if (ch === current[current.length - 1]){
+      groups.push(current);
+      current = ch;
+    } else {
+      current += ch;
+    }
+  }
+  groups.push(current);
+  return groups;
+}
+
+function bracketDepth(s){
+  if (s.length < 2) return 0;
+  if (s[0] === s[s.length - 1]){
+    return 1 + bracketDepth(s.slice(1, -1));
+  }
+  return 0;
+}
+
+// ---------- Cas9 PAM sites (NGG) ----------
+// Standard, textbook motif: any base ('N') followed by G, G.
+// This is descriptive only -- it marks where the motif occurs, nothing more.
+function countPamSites(){
+  let count = 0;
+  for (let i = 0; i + 2 < flatChars.length; i++){
+    if (flatChars[i + 1].ch === 'G' && flatChars[i + 2].ch === 'G') count++;
+  }
+  return count;
+}
+
+function markPamSites(){
+  flatChars.forEach(f => f.el.classList.remove('pam'));
+  if (pamToggle.value !== 'on') return;
+  for (let i = 0; i + 2 < flatChars.length; i++){
+    if (flatChars[i + 1].ch === 'G' && flatChars[i + 2].ch === 'G'){
+      flatChars[i].el.classList.add('pam');
+      flatChars[i + 1].el.classList.add('pam');
+      flatChars[i + 2].el.classList.add('pam');
+    }
+  }
+}
+
+// ---------- state ----------
+let audioCtx = null;
+let playTimer = null;
+let isoTimer = null;
+let flatChars = []; // {ch, el} -- every char in the rendered sequence, in order
+let groupsData = []; // {chars: [{ch, el}], mirrorEl}
+let globalSymbolIndex = new Map();
+let selectedGroupIndex = null;
+
+const sourceSel = document.getElementById('source');
+const lengthSlider = document.getElementById('length');
+const lengthVal = document.getElementById('lengthVal');
+const tuningSel = document.getElementById('tuning');
+const tempoSlider = document.getElementById('tempo');
+const tempoVal = document.getElementById('tempoVal');
+const mirrorModeSel = document.getElementById('mirrorMode');
+const pamToggle = document.getElementById('pamToggle');
+const customBox = document.getElementById('customBox');
+const customText = document.getElementById('customText');
+const ribbon = document.getElementById('ribbon');
+const legend = document.getElementById('legend');
+const statsEl = document.getElementById('stats');
+const playBtn = document.getElementById('playBtn');
+const downloadWavBtn = document.getElementById('downloadWavBtn');
+const stopBtn = document.getElementById('stopBtn');
+
+const isolatePanel = document.getElementById('isolatePanel');
+const isoGroupLabel = document.getElementById('isoGroupLabel');
+const isoRibbon = document.getElementById('isoRibbon');
+const isoOrderSel = document.getElementById('isoOrder');
+const isoRotateField = document.getElementById('isoRotateField');
+const isoRotateSlider = document.getElementById('isoRotate');
+const isoRotateVal = document.getElementById('isoRotateVal');
+const isoInvertSel = document.getElementById('isoInvert');
+const isoDurationSel = document.getElementById('isoDuration');
+const isoWaveSel = document.getElementById('isoWave');
+const isoOctaveSlider = document.getElementById('isoOctave');
+const isoOctaveVal = document.getElementById('isoOctaveVal');
+const isoLoopSel = document.getElementById('isoLoop');
+const isoPlayBtn = document.getElementById('isoPlayBtn');
+const isoStopBtn = document.getElementById('isoStopBtn');
+const isoCloseBtn = document.getElementById('isoCloseBtn');
+
+const genASelect = document.getElementById('genASelect');
+const genAnum = document.getElementById('genAnum');
+const genBSelect = document.getElementById('genBSelect');
+const genBnum = document.getElementById('genBnum');
+const interfereLoopSel = document.getElementById('interfereLoop');
+const genBtn = document.getElementById('genBtn');
+const interferePlayBtn = document.getElementById('interferePlayBtn');
+const interfereStopBtn = document.getElementById('interfereStopBtn');
+const interfereOutput = document.getElementById('interfereOutput');
+
+let interfereTimer = null;
+let currentResultant = null; // { events, L, groupAIdx, groupBIdx }
+
+function currentRawSequence(){
+  if (sourceSel.value === 'pi') return PI_DIGITS;
+  if (sourceSel.value === 'dna') return DNA_SAMPLE;
+  return (customText.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function render(){
+  stopAll();
+  closeIsolate();
+  const raw = currentRawSequence();
+  const max = raw.length || 1;
+  lengthSlider.max = Math.min(2000, Math.max(20, max));
+  const len = Math.min(parseInt(lengthSlider.value, 10), max);
+  lengthVal.textContent = len;
+  const seq = raw.slice(0, len);
+
+  const groups = mirrorGroups(seq);
+
+  // symbol -> color index, ordered by first appearance
+  const symbolIndex = new Map();
+  for (const ch of seq){
+    if (!symbolIndex.has(ch)) symbolIndex.set(ch, symbolIndex.size);
+  }
+  globalSymbolIndex = symbolIndex;
+
+  ribbon.innerHTML = '';
+  flatChars = [];
+  groupsData = [];
+  let repeats = 0;
+  let longest = 0;
+  let maxDepth = 0;
+
+  groups.forEach((g, gi) => {
+    const depth = bracketDepth(g);
+    maxDepth = Math.max(maxDepth, depth);
+    longest = Math.max(longest, g.length);
+    const groupEl = document.createElement('span');
+    groupEl.className = 'group';
+    groupEl.dataset.depth = Math.min(depth, 5);
+    groupEl.title = g + ' (length ' + g.length + (depth ? ', nested depth ' + depth : '') + ') — click to isolate';
+
+    const chars = [];
+    for (const ch of g){
+      const chEl = document.createElement('span');
+      chEl.className = 'ch';
+      chEl.textContent = ch;
+      chEl.style.color = colorFor(symbolIndex, ch);
+      groupEl.appendChild(chEl);
+      flatChars.push({ ch, el: chEl });
+      chars.push({ ch, el: chEl });
+    }
+    ribbon.appendChild(groupEl);
+
+    groupEl.addEventListener('click', () => selectGroup(gi));
+
+    let mirrorEl = null;
+    if (gi < groups.length - 1){
+      repeats++;
+      mirrorEl = document.createElement('span');
+      mirrorEl.className = 'mirror';
+      mirrorEl.textContent = '|';
+      ribbon.appendChild(mirrorEl);
+    }
+
+    groupsData.push({ chars, mirrorEl, groupEl });
+  });
+
+  // legend
+  legend.innerHTML = '';
+  for (const [ch, idx] of symbolIndex.entries()){
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = PALETTE[idx % PALETTE.length];
+    item.appendChild(sw);
+    item.appendChild(document.createTextNode(ch));
+    legend.appendChild(item);
+  }
+
+  // stats
+  const density = seq.length ? (repeats / seq.length * 100).toFixed(1) : '0.0';
+  const pamCount = countPamSites();
+  statsEl.innerHTML = '';
+  const stats = [
+    ['length', seq.length],
+    ['groups', groups.length],
+    ['repeat sites', repeats],
+    ['repeat density', density + '%'],
+    ['longest group', longest],
+    ['max nesting depth', maxDepth],
+    ['PAM sites (NGG)', pamCount]
+  ];
+  for (const [label, num] of stats){
+    const div = document.createElement('div');
+    div.className = 'stat';
+    div.innerHTML = '<div class="num">' + num + '</div><div class="label">' + label + '</div>';
+    statsEl.appendChild(div);
+  }
+
+  populateGroupSelectors();
+  markPamSites();
+}
+
+// ---------- sonification ----------
+// pentatonic ratios relative to base frequency
+const PENTATONIC = [1, 9/8, 5/4, 3/2, 5/3];
+
+function freqForStep(idx, base){
+  const octave = Math.floor(idx / PENTATONIC.length);
+  const step = idx % PENTATONIC.length;
+  return base * PENTATONIC[step] * Math.pow(2, octave);
+}
+
+function ensureAudio(){
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, duration, gainVal, waveform){
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = waveform || 'sine';
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playClick(){
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.04);
+}
+
+// ---------- main playback (whole sequence, with rest/click/none at mirrors) ----------
+function buildSchedule(){
+  const schedule = [];
+  groupsData.forEach((g, gi) => {
+    g.chars.forEach(c => schedule.push({ type: 'note', ch: c.ch, el: c.el }));
+    if (gi < groupsData.length - 1){
+      schedule.push({ type: 'mirror', el: g.mirrorEl });
+    }
+  });
+  return schedule;
+}
+
+function startPlayback(){
+  if (!groupsData.length) return;
+  ensureAudio();
+  stopAll();
+
+  const base = parseInt(tuningSel.value, 10) / 2;
+  const notesPerSec = parseInt(tempoSlider.value, 10);
+  const interval = 1000 / notesPerSec;
+  const mode = mirrorModeSel.value;
+  const schedule = buildSchedule();
+
+  let i = 0;
+  function step(){
+    flatChars.forEach(f => f.el.classList.remove('active'));
+    groupsData.forEach(g => { if (g.mirrorEl) g.mirrorEl.classList.remove('pulse'); });
+
+    if (i >= schedule.length){ stopPlayback(); return; }
+    const item = schedule[i];
+
+    if (item.type === 'note'){
+      item.el.classList.add('active');
+      item.el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      const freq = freqForStep(globalSymbolIndex.get(item.ch), base);
+      playTone(freq, interval / 1000 * 0.9, 0.18, 'sine');
+      i++;
+      playTimer = setTimeout(step, interval);
+    } else {
+      // mirror: rest (silence), click, or skip straight through
+      if (item.el) item.el.classList.add('pulse');
+      if (mode === 'click') playClick();
+      const wait = mode === 'none' ? interval * 0.15 : interval;
+      i++;
+      playTimer = setTimeout(step, wait);
+    }
+  }
+  step();
+}
+
+function stopPlayback(){
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  flatChars.forEach(f => f.el.classList.remove('active'));
+  groupsData.forEach(g => { if (g.mirrorEl) g.mirrorEl.classList.remove('pulse'); });
+}
+
+function stopAll(){
+  stopPlayback();
+  stopIsolated();
+  stopInterference();
+}
+
+// ---------- export to a real, downloadable WAV file ----------
+function encodeWavMono(samples, sampleRate){
+  const bytesPerSample = 2;
+  const dataSize = samples.length * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  function writeStr(offset, str){ for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, bytesPerSample * 8, true);
+  writeStr(36, 'data');
+  view.setUint32(40, dataSize, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++){
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  return buffer;
+}
+
+async function downloadWav(){
+  if (!groupsData.length) return;
+  const base = parseInt(tuningSel.value, 10) / 2;
+  const notesPerSec = parseInt(tempoSlider.value, 10);
+  const interval = 1 / notesPerSec;
+  const mode = mirrorModeSel.value;
+  const schedule = buildSchedule();
+
+  let totalDuration = 0;
+  schedule.forEach(item => {
+    totalDuration += item.type === 'note' ? interval : (mode === 'none' ? interval * 0.15 : interval);
+  });
+  totalDuration += 0.3; // tail so the last note's decay isn't clipped
+
+  const sampleRate = 44100;
+  const offlineCtx = new OfflineAudioContext(1, Math.ceil(totalDuration * sampleRate), sampleRate);
+
+  let t = 0;
+  schedule.forEach(item => {
+    if (item.type === 'note'){
+      const freq = freqForStep(globalSymbolIndex.get(item.ch), base);
+      const osc = offlineCtx.createOscillator();
+      const gain = offlineCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.18, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + interval * 0.9);
+      osc.connect(gain).connect(offlineCtx.destination);
+      osc.start(t);
+      osc.stop(t + interval * 0.9);
+      t += interval;
+    } else {
+      if (mode === 'click'){
+        const osc = offlineCtx.createOscillator();
+        const gain = offlineCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(180, t);
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        osc.connect(gain).connect(offlineCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.04);
+      }
+      t += mode === 'none' ? interval * 0.15 : interval;
+    }
+  });
+
+  downloadWavBtn.textContent = 'Rendering…';
+  downloadWavBtn.disabled = true;
+  try {
+    const renderedBuffer = await offlineCtx.startRendering();
+    const samples = renderedBuffer.getChannelData(0);
+    const wavBuffer = encodeWavMono(samples, sampleRate);
+    const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sequence-atlas.wav';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } finally {
+    downloadWavBtn.textContent = '⬇ Download WAV';
+    downloadWavBtn.disabled = false;
+  }
+}
+
+// ---------- isolate & evolve a single group (Schillinger-style transforms) ----------
+function selectGroup(gi){
+  stopAll();
+  selectedGroupIndex = gi;
+  groupsData.forEach((g, idx) => g.groupEl.classList.toggle('selected', idx === gi));
+  renderIsolatePanel();
+}
+
+function closeIsolate(){
+  stopIsolated();
+  selectedGroupIndex = null;
+  groupsData.forEach(g => g.groupEl.classList.remove('selected'));
+  isolatePanel.style.display = 'none';
+}
+
+function renderIsolatePanel(){
+  const g = groupsData[selectedGroupIndex];
+  if (!g) return;
+  isolatePanel.style.display = 'block';
+  const text = g.chars.map(c => c.ch).join('');
+  isoGroupLabel.textContent = '"' + text + '" (' + g.chars.length + ' symbols)';
+
+  isoRibbon.innerHTML = '';
+  g.chars.forEach(c => {
+    const span = document.createElement('span');
+    span.className = 'ch';
+    span.textContent = c.ch;
+    span.style.color = c.el.style.color;
+    isoRibbon.appendChild(span);
+  });
+
+  isolatePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function rotateArray(arr, k){
+  const n = arr.length;
+  if (!n) return arr;
+  k = ((k % n) + n) % n;
+  return arr.slice(k).concat(arr.slice(0, k));
+}
+
+function localStepMap(chars){
+  const m = new Map();
+  chars.forEach(ch => { if (!m.has(ch)) m.set(ch, m.size); });
+  return m;
+}
+
+function playIsolated(){
+  const g = groupsData[selectedGroupIndex];
+  if (!g) return;
+  ensureAudio();
+  stopAll();
+  groupsData.forEach((gg, idx) => gg.groupEl.classList.toggle('selected', idx === selectedGroupIndex));
+
+  const orderMode = isoOrderSel.value;
+  const rotateAmt = parseInt(isoRotateSlider.value, 10);
+  const invertOn = isoInvertSel.value === 'yes';
+  const durMult = parseFloat(isoDurationSel.value);
+  const waveform = isoWaveSel.value;
+  const octaveShift = parseInt(isoOctaveSlider.value, 10);
+  const loop = isoLoopSel.value === 'yes';
+
+  const base = parseInt(tuningSel.value, 10) / 2;
+  const notesPerSec = parseInt(tempoSlider.value, 10);
+  const interval = (1000 / notesPerSec) * durMult;
+  const octaveMult = Math.pow(2, octaveShift);
+
+  // pitch contour reference always comes from the ORIGINAL order,
+  // so inversion/retrograde reflect a stable axis rather than a shifting one
+  const steps = localStepMap(g.chars.map(c => c.ch));
+  const maxStep = Math.max(0, steps.size - 1);
+
+  let order = g.chars.slice();
+  if (orderMode === 'retrograde') order = order.slice().reverse();
+  else if (orderMode === 'circular') order = rotateArray(order, rotateAmt);
+
+  let i = 0;
+  function step(){
+    g.chars.forEach(c => c.el.classList.remove('iso-active'));
+    if (i >= order.length){
+      if (loop){
+        // a short rest between repeats, echoing the mirror's silence
+        isoTimer = setTimeout(step, interval);
+        i = 0;
+        return;
+      }
+      stopIsolated();
+      return;
+    }
+    const { ch, el } = order[i];
+    el.classList.add('iso-active');
+    let stepIdx = steps.get(ch);
+    if (invertOn) stepIdx = maxStep - stepIdx;
+    const freq = freqForStep(stepIdx, base) * octaveMult;
+    playTone(freq, interval / 1000 * 0.85, 0.18, waveform);
+    i++;
+    isoTimer = setTimeout(step, interval);
+  }
+  step();
+}
+
+function stopIsolated(){
+  if (isoTimer) clearTimeout(isoTimer);
+  isoTimer = null;
+  groupsData.forEach(g => g.chars.forEach(c => c.el.classList.remove('iso-active')));
+}
+
+// ---------- interference / resultant rhythm ----------
+function populateGroupSelectors(){
+  const prevA = genASelect.value;
+  const prevB = genBSelect.value;
+  genASelect.innerHTML = '';
+  genBSelect.innerHTML = '';
+  groupsData.forEach((g, idx) => {
+    const text = g.chars.map(c => c.ch).join('');
+    const preview = text.length > 10 ? text.slice(0, 10) + '…' : text;
+    const optA = document.createElement('option');
+    optA.value = idx;
+    optA.textContent = '#' + idx + ' "' + preview + '" (' + text.length + ')';
+    genASelect.appendChild(optA);
+    const optB = optA.cloneNode(true);
+    genBSelect.appendChild(optB);
+  });
+  if (groupsData.length){
+    genASelect.value = prevA && Number(prevA) < groupsData.length ? prevA : 0;
+    genBSelect.value = prevB && Number(prevB) < groupsData.length ? prevB : Math.min(1, groupsData.length - 1);
+    updateGenDefault(genASelect, genAnum);
+    updateGenDefault(genBSelect, genBnum);
+  }
+  interfereOutput.innerHTML = '';
+  currentResultant = null;
+}
+
+function updateGenDefault(selectEl, numEl){
+  const idx = parseInt(selectEl.value, 10);
+  const g = groupsData[idx];
+  if (!g) return;
+  numEl.value = Math.max(1, Math.min(24, g.chars.length));
+}
+
+function gcd(a, b){ return b === 0 ? a : gcd(b, a % b); }
+function lcm(a, b){ return (a * b) / gcd(a, b); }
+
+function computeResultant(a, b){
+  const CAP = 120;
+  const L = lcm(a, b);
+  if (L > CAP) return null;
+  const onsets = new Set();
+  for (let i = 0; i < L; i += a) onsets.add(i);
+  for (let i = 0; i < L; i += b) onsets.add(i);
+  const sorted = Array.from(onsets).sort((x, y) => x - y);
+  const events = sorted.map((pos, idx) => {
+    const isA = pos % a === 0;
+    const isB = pos % b === 0;
+    const next = idx + 1 < sorted.length ? sorted[idx + 1] : L;
+    return { pos, duration: next - pos, source: isA && isB ? 'both' : (isA ? 'a' : 'b') };
+  });
+  return { L, events };
+}
+
+function generateResultant(){
+  const a = Math.max(1, Math.min(24, parseInt(genAnum.value, 10) || 1));
+  const b = Math.max(1, Math.min(24, parseInt(genBnum.value, 10) || 1));
+  genAnum.value = a;
+  genBnum.value = b;
+  const result = computeResultant(a, b);
+  interfereOutput.innerHTML = '';
+  if (!result){
+    const warn = document.createElement('p');
+    warn.className = 'iwarn';
+    warn.textContent = 'That pair produces a cycle of ' + lcm(a, b) + ' units — too long to stay musical here. Try smaller or more closely related numbers.';
+    interfereOutput.appendChild(warn);
+    currentResultant = null;
+    return;
+  }
+  currentResultant = {
+    events: result.events,
+    L: result.L,
+    groupAIdx: parseInt(genASelect.value, 10),
+    groupBIdx: parseInt(genBSelect.value, 10)
+  };
+
+  const summary = document.createElement('p');
+  summary.className = 'note';
+  summary.style.marginTop = '4px';
+  summary.textContent = 'Generators ' + a + ' : ' + b + ' → cycle of ' + result.L + ' units, ' +
+    result.events.length + ' beats. Durations: ' + result.events.map(e => e.duration).join(', ');
+  interfereOutput.appendChild(summary);
+
+  const timeline = document.createElement('div');
+  timeline.className = 'interfere-timeline';
+  const pxPerUnit = 16;
+  result.events.forEach(ev => {
+    const block = document.createElement('div');
+    block.className = 'iblock';
+    block.style.width = (ev.duration * pxPerUnit) + 'px';
+    block.style.background = ev.source === 'both' ? '#b088c9' : (ev.source === 'a' ? '#e8a33d' : '#5fb3a3');
+    block.textContent = ev.source === 'both' ? 'AB' : ev.source.toUpperCase();
+    block.title = 'onset at unit ' + ev.pos + ', duration ' + ev.duration;
+    timeline.appendChild(block);
+  });
+  interfereOutput.appendChild(timeline);
+
+  const legendRow = document.createElement('div');
+  legendRow.className = 'legend';
+  legendRow.innerHTML =
+    '<div class="legend-item"><span class="swatch" style="background:#e8a33d;"></span>A only</div>' +
+    '<div class="legend-item"><span class="swatch" style="background:#5fb3a3;"></span>B only</div>' +
+    '<div class="legend-item"><span class="swatch" style="background:#b088c9;"></span>A + B together</div>';
+  interfereOutput.appendChild(legendRow);
+}
+
+function playResultant(){
+  if (!currentResultant){ generateResultant(); if (!currentResultant) return; }
+  const groupA = groupsData[currentResultant.groupAIdx];
+  const groupB = groupsData[currentResultant.groupBIdx];
+  if (!groupA || !groupB) return;
+
+  ensureAudio();
+  stopAll();
+
+  const stepsA = localStepMap(groupA.chars.map(c => c.ch));
+  const maxAUnused = stepsA.size - 1;
+  const stepsB = localStepMap(groupB.chars.map(c => c.ch));
+  const base = parseInt(tuningSel.value, 10) / 2;
+  const notesPerSec = parseInt(tempoSlider.value, 10);
+  const unitMs = 1000 / notesPerSec;
+  const loop = interfereLoopSel.value === 'yes';
+  const blocks = interfereOutput.querySelectorAll('.iblock');
+
+  let charIdxA = 0, charIdxB = 0, i = 0;
+  function step(){
+    blocks.forEach(b => b.classList.remove('active'));
+    if (i >= currentResultant.events.length){
+      if (loop){ i = 0; interfereTimer = setTimeout(step, unitMs); return; }
+      stopInterference();
+      return;
+    }
+    const ev = currentResultant.events[i];
+    if (blocks[i]) blocks[i].classList.add('active');
+    const durSec = (ev.duration * unitMs / 1000) * 0.9;
+
+    if (ev.source === 'a' || ev.source === 'both'){
+      const ch = groupA.chars[charIdxA % groupA.chars.length].ch;
+      charIdxA++;
+      const freq = freqForStep(stepsA.get(ch), base);
+      playTone(freq, durSec, 0.18, 'sine');
+    }
+    if (ev.source === 'b' || ev.source === 'both'){
+      const ch = groupB.chars[charIdxB % groupB.chars.length].ch;
+      charIdxB++;
+      const freq = freqForStep(stepsB.get(ch), base) * 2; // an octave up so it stays distinguishable
+      playTone(freq, durSec, 0.14, 'triangle');
+    }
+
+    i++;
+    interfereTimer = setTimeout(step, ev.duration * unitMs);
+  }
+  step();
+}
+
+function stopInterference(){
+  if (interfereTimer) clearTimeout(interfereTimer);
+  interfereTimer = null;
+  interfereOutput.querySelectorAll('.iblock').forEach(b => b.classList.remove('active'));
+}
+
+// ---------- events ----------
+sourceSel.addEventListener('change', () => {
+  customBox.classList.toggle('show', sourceSel.value === 'custom');
+  render();
+});
+lengthSlider.addEventListener('input', () => { lengthVal.textContent = lengthSlider.value; render(); });
+tempoSlider.addEventListener('input', () => { tempoVal.textContent = tempoSlider.value; });
+pamToggle.addEventListener('change', markPamSites);
+customText.addEventListener('input', render);
+playBtn.addEventListener('click', startPlayback);
+downloadWavBtn.addEventListener('click', downloadWav);
+stopBtn.addEventListener('click', stopPlayback);
+
+isoOrderSel.addEventListener('change', () => {
+  isoRotateField.style.display = isoOrderSel.value === 'circular' ? 'flex' : 'none';
+});
+isoRotateSlider.addEventListener('input', () => { isoRotateVal.textContent = isoRotateSlider.value; });
+isoOctaveSlider.addEventListener('input', () => { isoOctaveVal.textContent = isoOctaveSlider.value; });
+isoPlayBtn.addEventListener('click', playIsolated);
+isoStopBtn.addEventListener('click', stopIsolated);
+isoCloseBtn.addEventListener('click', closeIsolate);
+
+genASelect.addEventListener('change', () => updateGenDefault(genASelect, genAnum));
+genBSelect.addEventListener('change', () => updateGenDefault(genBSelect, genBnum));
+genBtn.addEventListener('click', generateResultant);
+interferePlayBtn.addEventListener('click', playResultant);
+interfereStopBtn.addEventListener('click', stopInterference);
+
+render();
+</script>
+</body>
+</html>
